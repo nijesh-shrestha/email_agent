@@ -80,7 +80,7 @@ def send_email(to: str, subject: str, body: str) -> dict:
 
 root_agent = Agent(
     name="email_agent",
-    model = LiteLlm(model="groq/llama-3.1-8b-instant"),
+    model = LiteLlm(model="groq/llama-3.3-70b-versatile"),
     description="An agent that composes and sends emails on the user's behalf via Gmail.",
     instruction=(
         "You are an email assistant.\n\n"
@@ -97,8 +97,3 @@ root_agent = Agent(
     ),
     tools=[send_email]
 )
-
-
-
-
-
