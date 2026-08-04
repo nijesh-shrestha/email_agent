@@ -13,8 +13,16 @@ from googleapiclient.discovery import build
 SCOPES=["https://www.googleapis.com/auth/gmail.send"]
 
 load_dotenv()
-CREDENTIALS_FILE="credentials.json"
-TOKEN_FILE="token.json"
+
+CREDENTIALS_PATH = os.getenv(
+    "GOOGLE_CREDENTIALS_PATH",
+    "credentials.json"
+)
+
+TOKEN_PATH = os.getenv(
+    "GOOGLE_TOKEN_PATH",
+    "token.json"
+)
 
 print("Current working directory:", os.getcwd())
 print("credentials.json exists:", os.path.exists("credentials.json"))
@@ -24,19 +32,19 @@ def _get_gmail_service():
     """Load cached OAuth credentials, refreshing or running the consent flow as needed."""
 
     creds = None
-    if os.path.exists(TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+    if os.path.exists(TOKEN_PATH):
+        creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            if not os.path.exists(CREDENTIALS_FILE):
-                raise FileNotFoundError(f"Missiong {CREDENTIALS_FILE}.")
+            if not os.path.exists(CREDENTIALS_PATH):
+                raise FileNotFoundError(f"Missiong {CREDENTIALS_PATH}.")
 
-            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
             creds = flow.run_local_server(port=0)
-            with open(TOKEN_FILE, "w") as f:
+            with open(TOKEN_PATH, "w") as f:
                 f.write(creds.to_json())
 
     return build("gmail", "v1", credentials=creds)
