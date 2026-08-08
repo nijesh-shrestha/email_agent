@@ -1,25 +1,51 @@
-from sqlalchemy import ForeignKey, Text, DateTime
+from datetime import datetime
+from sqlalchemy import String, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database.base import Base
+from database.base import Base
+
 
 class OAuthAccount(Base):
     __tablename__ = "oauth_accounts"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id")
+    id: Mapped[int] = mapped_column(
+        primary_key=True,
+        autoincrement=True
     )
 
-    provider: Mapped[str] = mapped_column(default="google")
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False
+    )
 
-    access_token: Mapped[str] = mapped_column(Text)
+    provider: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False
+    )
 
-    refresh_token: Mapped[str] = mapped_column(Text)
+    provider_account_id: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False
+    )
 
-    expires_at: Mapped[DateTime] = mapped_column(DateTime)
+    email: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False
+    )
 
-    scope: Mapped[str] = mapped_column(Text)
+    access_token: Mapped[str] = mapped_column(
+        String,
+        nullable=False
+    )
+
+    refresh_token: Mapped[str] = mapped_column(
+        String,
+        nullable=False
+    )
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False
+    )
 
     user = relationship("User")
