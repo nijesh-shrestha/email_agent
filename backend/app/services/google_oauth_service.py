@@ -1,11 +1,10 @@
 import os
-
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 
-from database.models import OAuthAccount
+from app.database.models import OAuthAccount
 
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -16,24 +15,19 @@ SCOPES = [
 ]
 
 
-def get_google_credentials(
-    db,
-    user_id: int,
-) -> Credentials:
-
+def get_google_credentials(db, user_id: int) -> Credentials:
+    """Return refreshed google Credentials for the given user, or raise ValueError if not found."""
     oauth_account = (
         db.query(OAuthAccount)
         .filter(
-            OAuthAccount.user_id == user_id,
+            OAuthAccount.user_id == int(user_id),
             OAuthAccount.provider == "google",
         )
         .first()
     )
 
     if not oauth_account:
-        raise ValueError(
-            "Google account is not connected."
-        )
+        raise ValueError("Google account is not connected.")
 
     creds = Credentials(
         token=oauth_account.access_token,
@@ -44,24 +38,17 @@ def get_google_credentials(
         scopes=SCOPES,
     )
 
+    # If credentials are not valid, try to refresh using stored refresh token.
     if not creds.valid:
-
         if creds.expired and creds.refresh_token:
-
             creds.refresh(Request())
 
             oauth_account.access_token = creds.token
-            oauth_account.expires_at = (
-                datetime.now(timezone.utc)
-                + timedelta(seconds=3600)
-            )
-
+            oauth_account.expires_at = creds.expiry if creds.expiry else datetime.now(timezone.utc)
             db.commit()
-
         else:
             raise ValueError(
-                "Google credentials are invalid. "
-                "Please reconnect your Google account."
+                "Google credentials are invalid. Please reconnect your Google account."
             )
 
     return creds
