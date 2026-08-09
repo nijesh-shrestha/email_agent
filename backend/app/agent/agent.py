@@ -1,6 +1,7 @@
 from google.adk.agents import Agent
 from google.adk.models.lite_llm import LiteLlm
-from services.gmail import get_current_user, send_email
+
+from app.agent.tools import send_email_tool, get_user_tool
 
 root_agent = Agent(
     name="email_agent",
@@ -38,5 +39,5 @@ root_agent = Agent(
         "successfully. If it failed, report the error without claiming that the "
         "email was sent."
     ),
-    tools=[send_email, get_current_user],
+    tools=[send_email_tool, get_user_tool],
 )
