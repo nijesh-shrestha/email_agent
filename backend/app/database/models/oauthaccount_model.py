@@ -25,4 +25,15 @@ class OAuthAccount(Base):
 
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    user = relationship("User")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+    user: Mapped["User"] = relationship(back_populates="oauth_accounts")
