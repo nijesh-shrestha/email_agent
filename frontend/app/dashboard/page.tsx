@@ -13,6 +13,11 @@ type UserProfile = {
   image?: string | null;
 };
 
+export type AgentMessage = {
+  role: "user" | "model" | "tool";
+  text: string;
+};
+
 export default function Dashboard() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -20,6 +25,11 @@ export default function Dashboard() {
   const [googleStatus, setGoogleStatus] = useState<any>(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<string | null>(null);
+  const [agentPrompt, setAgentPrompt] = useState("");
+  const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
+  const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -122,6 +132,58 @@ export default function Dashboard() {
     }
   }
 
+  async function sendAgentMessage(e: React.FormEvent) {
+    e.preventDefault();
+    const prompt = agentPrompt.trim();
+    if (!prompt) return;
+
+    const token = window.localStorage.getItem("email_agent_token");
+    if (!token) return router.replace("/login");
+
+    const userMessage: AgentMessage = { role: "user", text: prompt };
+    setAgentPrompt("");
+    setAgentError(null);
+    setAgentLoading(true);
+
+    try {
+      const res = await fetch(`${API_URL}/api/agent/run`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: prompt, session_id: agentSessionId }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || "Agent request failed");
+      }
+
+      const data = await res.json();
+      setAgentSessionId(data.session_id);
+
+      const nextMessages: AgentMessage[] = [];
+      for (const event of data.events || []) {
+        for (const part of event.content || []) {
+          if (part.text) {
+            const role: AgentMessage["role"] = event.author === "tool" ? "tool" : "model";
+            nextMessages.push({
+              role,
+              text: part.text,
+            });
+          }
+        }
+      }
+
+      setAgentMessages((current) => [...current, userMessage, ...nextMessages]);
+    } catch (err) {
+      setAgentError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAgentLoading(false);
+    }
+  }
+
   if (loading) {
     return <main className="flex min-h-screen items-center justify-center">Loading...</main>;
   }
@@ -178,6 +240,65 @@ export default function Dashboard() {
               {sendResult ? <p className="text-sm text-slate-700">{sendResult}</p> : null}
             </div>
           </form>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">AI Email Assistant</p>
+
+          <form onSubmit={sendAgentMessage} className="mt-4 space-y-3">
+            <div>
+              <label className="mb-1 block text-sm text-slate-700" htmlFor="agentPrompt">
+                Ask the agent to draft, review, or send an email
+              </label>
+              <textarea
+                id="agentPrompt"
+                value={agentPrompt}
+                onChange={(event) => setAgentPrompt(event.target.value)}
+                rows={5}
+                className="w-full rounded-md border border-slate-300 px-3 py-2"
+                placeholder="Compose an email to the team asking for the project update..."
+                required
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={agentLoading || !agentPrompt.trim()}
+                className="rounded bg-slate-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {agentLoading ? "Thinking..." : "Send to agent"}
+              </button>
+
+              {agentError ? <p className="text-sm text-red-600">{agentError}</p> : null}
+            </div>
+          </form>
+
+          {agentSessionId ? (
+            <p className="mt-3 text-sm text-slate-500">Agent session id: {agentSessionId}</p>
+          ) : null}
+
+          {agentMessages.length ? (
+            <div className="mt-4 space-y-3">
+              {agentMessages.map((message, index) => (
+                <div
+                  key={`${index}-${message.role}`}
+                  className={`rounded-xl border px-4 py-3 ${
+                    message.role === "user"
+                      ? "border-slate-200 bg-slate-50"
+                      : message.role === "tool"
+                      ? "border-amber-200 bg-amber-50"
+                      : "border-slate-200 bg-white"
+                  }`}
+                >
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                    {message.role}
+                  </p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">{message.text}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
     </main>

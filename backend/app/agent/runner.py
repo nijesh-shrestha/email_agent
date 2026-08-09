@@ -6,6 +6,7 @@ and tools wiring without requiring a full production Runner configuration.
 from importlib import import_module
 
 from google.adk.runners import Runner
+from google.genai import types
 # InMemorySessionService may or may not be present depending on ADK version.
 # Import safely.
 try:
@@ -33,6 +34,76 @@ if InMemorySessionService is not None:
         runner = Runner(app_name="email_agent", agent=root_agent, session_service=session_service)
     except Exception:
         runner = None
+
+
+def get_runner() -> Runner:
+    global runner
+    if runner is not None:
+        return runner
+    if InMemorySessionService is None:
+        raise RuntimeError(
+            "ADK InMemorySessionService is unavailable in this environment. "
+            "Install a compatible google-adk and google-genai version."
+        )
+    try:
+        session_service = InMemorySessionService()
+        runner = Runner(app_name="email_agent", agent=root_agent, session_service=session_service)
+        return runner
+    except Exception as exc:
+        raise RuntimeError("Failed to initialize ADK Runner") from exc
+
+
+def build_user_content(message: str) -> types.Content:
+    """Build a user content object for the agent from a plain text message."""
+    return types.Content(role="user", parts=[types.Part(text=message)])
+
+
+def _serialize_model_obj(obj: object) -> object:
+    if obj is None:
+        return None
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    if hasattr(obj, "dict"):
+        try:
+            return obj.dict()
+        except Exception:
+            pass
+    return str(obj)
+
+
+def _serialize_part(part: types.Part) -> dict:
+    return {
+        "text": getattr(part, "text", None),
+        "thought": getattr(part, "thought", None),
+        "function_call": _serialize_model_obj(getattr(part, "function_call", None)),
+        "function_response": _serialize_model_obj(getattr(part, "function_response", None)),
+        "tool_call": _serialize_model_obj(getattr(part, "tool_call", None)),
+        "tool_response": _serialize_model_obj(getattr(part, "tool_response", None)),
+        "part_metadata": getattr(part, "part_metadata", None),
+    }
+
+
+def serialize_event(event: object) -> dict:
+    content = getattr(getattr(event, "content", None), "parts", None) or []
+    return {
+        "author": getattr(event, "author", None),
+        "invocation_id": getattr(event, "invocation_id", None),
+        "partial": getattr(event, "partial", False),
+        "content": [_serialize_part(part) for part in content],
+    }
+
+
+def default_session_id_for_user(user_id: str) -> str:
+    return f"user-{user_id}"
+
+
+def run_agent_message(user_id: str, session_id: str, message: str) -> list[dict]:
+    runner = get_runner()
+    user_content = build_user_content(message)
+    events = []
+    for event in runner.run(user_id=str(user_id), session_id=session_id, new_message=user_content):
+        events.append(serialize_event(event))
+    return events
 
 
 def create_test_agent_copy():

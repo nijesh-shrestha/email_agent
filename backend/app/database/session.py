@@ -41,7 +41,7 @@ def get_session_factory() -> sessionmaker:
 
 
 def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
+    db = SessionLocal()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
     try:
         yield db
     finally:
