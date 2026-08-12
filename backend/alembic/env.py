@@ -4,11 +4,13 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-from app.database.base import Base
-import app.database.models
 from dotenv import load_dotenv
 
 from alembic import context
+
+from app.database.base import Base
+from app.database.models import ChatSession, Message, OAuthAccount, User
+from app.database.session import get_database_url
 
 load_dotenv()
 
@@ -67,9 +69,9 @@ def run_migrations_online() -> None:
 
     config.set_main_option(
         "sqlalchemy.url",
-        os.environ["DATABASE_URL"]
+        get_database_url(),
     )
-    
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

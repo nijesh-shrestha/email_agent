@@ -1,12 +1,17 @@
 "use client";
 
-import { signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export default function LogoutButton() {
+  const router = useRouter();
+
   return (
     <button
-      onClick={() => signOut({ callbackUrl: "/login" })}
-      className="px-4 py-2 rounded bg-red-600 text-white"
+      onClick={() => {
+        window.localStorage.removeItem("email_agent_token");
+        router.push("/login");
+      }}
+      className="rounded bg-red-600 px-4 py-2 text-white"
     >
       Logout
     </button>
