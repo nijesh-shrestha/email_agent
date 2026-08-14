@@ -4,6 +4,8 @@ from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
+from app.database.models.chat_model import ChatSession
+from app.database.models.oauthaccount_model import OAuthAccount
 
 
 class User(Base):

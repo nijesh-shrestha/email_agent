@@ -13,6 +13,11 @@ type UserProfile = {
   image?: string | null;
 };
 
+interface GoogleStatus {
+  connected: boolean;
+  email?: string;
+}
+
 export type AgentMessage = {
   role: "user" | "model" | "tool";
   text: string;
@@ -22,7 +27,7 @@ export default function Dashboard() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
-  const [googleStatus, setGoogleStatus] = useState<any>(null);
+  const [googleStatus, setGoogleStatus] = useState<GoogleStatus | null>(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<string | null>(null);
   const [agentPrompt, setAgentPrompt] = useState("");
@@ -33,6 +38,14 @@ export default function Dashboard() {
   const router = useRouter();
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromUrl = params.get("token");
+
+    if (tokenFromUrl) {
+      window.localStorage.setItem("email_agent_token", tokenFromUrl);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+
     const token = window.localStorage.getItem("email_agent_token");
     if (!token) {
       router.replace("/login");
@@ -221,15 +234,15 @@ export default function Dashboard() {
           <form onSubmit={sendTestEmail} className="mt-4 space-y-3">
             <div>
               <label className="mb-1 block text-sm text-slate-700">To</label>
-              <input name="to" className="w-full rounded-md border border-slate-300 px-3 py-2" required />
+              <input name="to" className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900" required />
             </div>
             <div>
               <label className="mb-1 block text-sm text-slate-700">Subject</label>
-              <input name="subject" className="w-full rounded-md border border-slate-300 px-3 py-2" required />
+              <input name="subject" className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900" required />
             </div>
             <div>
               <label className="mb-1 block text-sm text-slate-700">Body</label>
-              <textarea name="body" rows={6} className="w-full rounded-md border border-slate-300 px-3 py-2" required />
+              <textarea name="body" rows={6} className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900" required />
             </div>
 
             <div className="flex items-center gap-3">
@@ -255,7 +268,7 @@ export default function Dashboard() {
                 value={agentPrompt}
                 onChange={(event) => setAgentPrompt(event.target.value)}
                 rows={5}
-                className="w-full rounded-md border border-slate-300 px-3 py-2"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900"
                 placeholder="Compose an email to the team asking for the project update..."
                 required
               />
