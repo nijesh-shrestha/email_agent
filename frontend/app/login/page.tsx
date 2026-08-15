@@ -6,7 +6,7 @@ export default function LoginPage() {
       <div className="w-full max-w-5xl rounded-3xl border border-slate-200 bg-white p-8 shadow-sm lg:flex lg:items-center lg:justify-between lg:gap-12">
         <div className="mb-8 max-w-lg lg:mb-0">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">
-            Module 1 — Authentication
+            Authentication
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">
             AI Email Agent

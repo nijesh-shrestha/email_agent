@@ -1,5 +1,7 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr, conint, constr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -11,8 +13,8 @@ router = APIRouter(prefix="/gmail", tags=["Gmail"])
 
 
 # Basic server-side validation constraints
-SubjectStr = constr(min_length=1, max_length=255)
-BodyStr = constr(min_length=1, max_length=10000)
+SubjectStr = Annotated[str, Field(min_length=1, max_length=255)]
+BodyStr = Annotated[str, Field(min_length=1, max_length=10000)]
 
 
 class SendRequest(BaseModel):

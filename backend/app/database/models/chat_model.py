@@ -4,6 +4,8 @@ from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
+from backend.app.database.models.user_model import User
+from backend.app.database.models.message_model import Message
 
 
 class ChatSession(Base):

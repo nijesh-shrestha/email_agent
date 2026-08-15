@@ -1,7 +1,7 @@
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field, constr
+from pydantic import BaseModel, Field
 
 from app.agent.runner import default_session_id_for_user, run_agent_message
 from app.auth.dependencies import get_current_user
@@ -10,7 +10,7 @@ router = APIRouter(prefix="/agent", tags=["Agent"])
 
 
 class AgentRequest(BaseModel):
-    message: constr(min_length=1, max_length=3000)
+    message: Annotated[str, Field(min_length=1, max_length=3000)]
     session_id: str | None = None
 
 
