@@ -4,7 +4,6 @@ from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
-from backend.app.database.models.user_model import User
 
 
 class OAuthAccount(Base):
@@ -37,4 +36,4 @@ class OAuthAccount(Base):
         onupdate=datetime.utcnow,
     )
 
-    user: Mapped["User"] = relationship(back_populates="oauth_accounts")
+    user = relationship("User", back_populates="oauth_accounts")

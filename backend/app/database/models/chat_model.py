@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
-from backend.app.database.models.user_model import User
-from backend.app.database.models.message_model import Message
+
+if TYPE_CHECKING:
+    from app.database.models.message_model import Message
 
 
 class ChatSession(Base):
@@ -28,8 +32,8 @@ class ChatSession(Base):
         onupdate=datetime.utcnow,
     )
 
-    user: Mapped["User"] = relationship(back_populates="chat_sessions")
-    messages: Mapped[list["Message"]] = relationship(
+    user = relationship("User", back_populates="chat_sessions")
+    messages: Mapped[list[Message]] = relationship(
         back_populates="chat_session",
         cascade="all, delete-orphan",
     )
