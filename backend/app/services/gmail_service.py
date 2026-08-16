@@ -42,3 +42,21 @@ def send_email(db, user_id: int, to: str, subject: str, body: str) -> Tuple[bool
         return False, {"status": "error", "detail": e.content.decode() if hasattr(e, "content") else str(e)}
     except Exception as e:
         return False, {"status": "error", "detail": str(e)}
+
+
+def get_current_user(db, user_id: int) -> dict:
+    """Get authenticated Gmail profile information for a specific app user."""
+    try:
+        service = get_gmail_service(db, user_id)
+        profile = service.users().getProfile(userId="me").execute()
+
+        return {
+            "status": "success",
+            "email_address": profile.get("emailAddress"),
+            "detail": f"Authenticated Gmail account: {profile.get('emailAddress')}",
+        }
+
+    except HttpError as e:
+        return {"status": "error", "detail": e.content.decode() if hasattr(e, "content") else str(e)}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}

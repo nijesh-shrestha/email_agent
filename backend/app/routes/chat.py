@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from google.genai import types
 
 from app.agent.runner import runner
-from backend.app.services.gmail import get_current_user
+from app.auth.dependencies import get_current_user
 
 router = APIRouter()
 
