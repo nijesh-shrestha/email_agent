@@ -14,12 +14,47 @@ The user should be able to:
 6. Review the generated email draft.
 7. Explicitly confirm the draft.
 8. Have the agent send the email through the authenticated user's Gmail account.
-9. Store users, OAuth information, conversations, and messages in Supabase PostgreSQL.
-10. Maintain separate data and Gmail credentials for every user.
+9. Ask the agent to read messages from a specific sender on selected dates and limit the number returned.
+10. Store users, OAuth information, conversations, and messages in Supabase PostgreSQL.
+11. Maintain separate data and Gmail credentials for every user.
 
 The application must be **multi-user**.
 
 A user's Gmail credentials must NEVER be shared with another user.
+
+## 1.1 New Gmail Read Workflow
+
+The backend now supports a read-email workflow for the agent and the UI.
+
+Required input contract:
+
+- of_user: the sender email address to search for
+- dates: an array of ISO dates such as ["2026-08-01", "2026-08-03"]
+- amount: the maximum number of matching messages to return
+
+Example request payload:
+
+```json
+{
+  "of_user": "sender@example.com",
+  "dates": ["2026-08-01", "2026-08-03"],
+  "amount": 5
+}
+```
+
+The system calls Gmail's `messages.list` API with a query like `from:(sender@example.com) after:... before:...` and then fetches the message metadata for each result.
+
+The response contains summary fields such as:
+
+- id
+- thread_id
+- from
+- subject
+- date
+- snippet
+- count
+
+This read workflow is available in both the backend API at `/api/gmail/read` and through the agent tool `read_emails_tool`.
 
 ---
 

@@ -30,6 +30,8 @@ export default function Dashboard() {
   const [googleStatus, setGoogleStatus] = useState<GoogleStatus | null>(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<string | null>(null);
+  const [readResult, setReadResult] = useState<string | null>(null);
+  const [readLoading, setReadLoading] = useState(false);
   const [agentPrompt, setAgentPrompt] = useState("");
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
   const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
@@ -145,6 +147,60 @@ export default function Dashboard() {
     }
   }
 
+  async function readGmailEmails(e: React.FormEvent) {
+    e.preventDefault();
+    setReadResult(null);
+    const token = window.localStorage.getItem("email_agent_token");
+    if (!token) return router.replace("/login");
+
+    const form = new FormData(e.target as HTMLFormElement);
+    const ofUser = String(form.get("of_user") || "").trim();
+    const datesRaw = String(form.get("dates") || "").trim();
+    const amount = Number(form.get("amount") || 5);
+    const dates = datesRaw
+      .split(",")
+      .map((date) => date.trim())
+      .filter(Boolean);
+
+    if (!ofUser) {
+      setReadResult("Please provide the sender email.");
+      return;
+    }
+
+    if (!dates.length) {
+      setReadResult("Please enter at least one date in YYYY-MM-DD format.");
+      return;
+    }
+
+    setReadLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/gmail/read`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ of_user: ofUser, dates, amount }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.detail ? JSON.stringify(data.detail) : "Failed to read emails");
+      }
+
+      const emailCount = data?.count ?? 0;
+      const emailList = Array.isArray(data?.emails) ? data.emails : [];
+      setReadResult(
+        `Found ${emailCount} email${emailCount === 1 ? "" : "s"} from ${ofUser}. ` +
+          (emailList.length ? JSON.stringify(emailList.slice(0, 5), null, 2) : "No matching emails found.")
+      );
+    } catch (err) {
+      setReadResult("Error: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setReadLoading(false);
+    }
+  }
+
   async function sendAgentMessage(e: React.FormEvent) {
     e.preventDefault();
     const prompt = agentPrompt.trim();
@@ -252,6 +308,42 @@ export default function Dashboard() {
 
               {sendResult ? <p className="text-sm text-slate-700">{sendResult}</p> : null}
             </div>
+          </form>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">Read Gmail</p>
+
+          <form onSubmit={readGmailEmails} className="mt-4 space-y-3">
+            <div>
+              <label className="mb-1 block text-sm text-slate-700">Email of user</label>
+              <input name="of_user" type="email" className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900" placeholder="sender@example.com" required />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-700">Dates</label>
+              <input
+                name="dates"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900"
+                placeholder="2026-08-01, 2026-08-03"
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-700">Amount</label>
+              <input name="amount" type="number" min={1} max={50} defaultValue={5} className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900" required />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button type="submit" disabled={readLoading} className="rounded bg-emerald-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-70">
+                {readLoading ? "Reading..." : "Read emails"}
+              </button>
+            </div>
+
+            {readResult ? (
+              <pre className="mt-3 max-h-80 overflow-auto rounded-md bg-slate-100 p-3 text-xs text-slate-800 whitespace-pre-wrap">
+                {readResult}
+              </pre>
+            ) : null}
           </form>
         </div>
 

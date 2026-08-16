@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
 from app.database.session import get_db
-from app.services.gmail_service import send_email
+from app.services.gmail_service import read_user_emails, send_email
 from app.services.rate_limiter import allow_send
 
 router = APIRouter(prefix="/gmail", tags=["Gmail"])
@@ -23,9 +23,14 @@ class SendRequest(BaseModel):
     body: BodyStr
 
 
+class ReadRequest(BaseModel):
+    of_user: EmailStr
+    dates: list[str] = Field(default_factory=list)
+    amount: int = Field(default=5, ge=1, le=50)
+
+
 @router.post("/send")
 def gmail_send(request: SendRequest, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    # Rate limiting (per-user)
     allowed, meta = allow_send(str(current_user.id))
     if not allowed:
         raise HTTPException(
@@ -36,16 +41,25 @@ def gmail_send(request: SendRequest, db: Session = Depends(get_db), current_user
             },
         )
 
-    # Ensure the user has a connected Google account - send_email will raise ValueError if not
     try:
         ok, payload = send_email(db, current_user.id, request.to, request.subject, request.body)
     except ValueError as ve:
-        # likely not connected
         raise HTTPException(status_code=400, detail=str(ve))
 
     if not ok:
-        # payload contains error detail
         raise HTTPException(status_code=500, detail=payload)
 
-    # Return success + rate limit meta for client convenience
     return {"status": "ok", **payload, "rate_limit": meta}
+
+
+@router.post("/read")
+def gmail_read(request: ReadRequest, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    try:
+        ok, payload = read_user_emails(db, current_user.id, request.of_user, request.dates, request.amount)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+    if not ok:
+        raise HTTPException(status_code=500, detail=payload)
+
+    return payload

@@ -3,8 +3,8 @@ from typing import Any, Dict
 from sqlalchemy.orm import Session
 
 from app.database.session import SessionLocal
-from app.services.gmail_service import send_email
 from app.database.models import User
+from app.services.gmail_service import read_user_emails, send_email
 
 
 def send_email_tool(user_id: str, to: str, subject: str, body: str) -> Dict[str, Any]:
@@ -13,10 +13,21 @@ def send_email_tool(user_id: str, to: str, subject: str, body: str) -> Dict[str,
     This function opens a DB session, calls the shared send_email service, and
     returns a structured result. Designed to be passed into the agent's tools list.
     """
-    # open a short-lived DB session
     db: Session = SessionLocal()
     try:
         ok, payload = send_email(db, int(user_id), to, subject, body)
+        if ok:
+            return {"success": True, **payload}
+        return {"success": False, **payload}
+    finally:
+        db.close()
+
+
+def read_emails_tool(user_id: str, of_user: str, dates: list[str] | str, amount: int = 5) -> Dict[str, Any]:
+    """Return matching Gmail messages from a specific sender and date list."""
+    db: Session = SessionLocal()
+    try:
+        ok, payload = read_user_emails(db, int(user_id), of_user, dates, amount)
         if ok:
             return {"success": True, **payload}
         return {"success": False, **payload}

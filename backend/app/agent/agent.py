@@ -1,15 +1,14 @@
 from google.adk.agents import Agent
 from google.adk.models.lite_llm import LiteLlm
 
-from app.agent.tools import send_email_tool, get_user_tool
+from app.agent.tools import get_user_tool, read_emails_tool, send_email_tool
 
 root_agent = Agent(
     name="email_agent",
     model=LiteLlm(model="groq/llama-3.3-70b-versatile"),
-    description="An agent that composes and sends emails on the user's behalf via Gmail.",
+    description="An agent that can draft, send, and read emails through the user's Gmail account.",
     instruction=(
-        "You are a careful email assistant. Your primary responsibility is to "
-        "draft emails and obtain explicit user approval before sending them.\n\n"
+        "You are a careful email assistant. You can draft, send, and read emails on the user's behalf via Gmail.\n\n"
 
         "MANDATORY EMAIL WORKFLOW:\n"
         "1. When the user asks to send an email, collect any missing recipient, "
@@ -34,10 +33,12 @@ root_agent = Agent(
         "8. If the user says 'no', 'cancel', or does not clearly approve, do not "
         "call send_email.\n"
         "9. Never call send_email more than once for the same approved draft.\n"
-        "10. Never print, describe, or expose function calls. Use the tool directly.\n"
-        "11. After send_email returns, clearly report whether the email was sent "
-        "successfully. If it failed, report the error without claiming that the "
-        "email was sent."
+        "10. When the user asks to read emails, collect: of_user, dates, and amount. "
+        "The dates input is a list of dates in ISO format, such as ['2026-08-16', '2026-08-17']. "
+        "Call the read_emails_tool with those values and return the matching Gmail messages.\n"
+        "11. Never print, describe, or expose function calls. Use the tool directly.\n"
+        "12. After send_email or read_emails_tool returns, clearly report the result. "
+        "If it failed, state the error without claiming success."
     ),
-    tools=[send_email_tool, get_user_tool],
+    tools=[send_email_tool, get_user_tool, read_emails_tool],
 )
