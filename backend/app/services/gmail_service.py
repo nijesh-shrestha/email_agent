@@ -40,41 +40,77 @@ def _extract_headers(headers: list[dict]) -> dict[str, str]:
     return extracted
 
 
-def read_emails(service, user_email: str, of_user: str, dates: Iterable[str] | str | None, amount: int = 5) -> dict:
-    """Read Gmail messages for a given sender and optional date list."""
+def read_emails(service, user_email: str, of_user: str, dates: Iterable[str] | str | None = None, amount: int | None = None) -> dict:
+    """Read Gmail messages for a given sender and optional date list.
+    
+    If amount is not provided, defaults to 1 (latest result).
+    If dates are not provided, searches without date filter.
+    of_user can be either an email address or a person's name.
+    """
     normalized_dates = _normalize_dates(dates)
     seen_ids: set[str] = set()
     collected: list[dict] = []
+    
+    # Default amount to 1 if not provided
+    if amount is None:
+        amount = 1
+    
+    print("normalized_dates:", normalized_dates)
+    print("amount:", amount)
+    print("of_user:", of_user)
 
-    filter_query = f"from:({of_user})"
+    # Build the from query - handle both email and name
+    # If of_user contains @, treat as email; otherwise treat as name/partial match
+    if "@" in of_user:
+        # Treat as email - search for exact email and also without quotes for broader match
+        filter_queries = [f'from:"{of_user}"', f'from:{of_user}']
+    else:
+        # Treat as name - search for name matches in from field (both quoted and unquoted)
+        filter_queries = [f'from:"{of_user}"', f'from:{of_user}']
+    
+    # Try each query variant until we find results
+    filter_query = filter_queries[0]
+    
+    # Helper function to try queries
+    def try_queries(queries, date_filter=None):
+        for q in queries:
+            try:
+                full_query = f"{q} {date_filter}" if date_filter else q
+                response = (
+                    service.users()
+                    .messages()
+                    .list(userId="me", q=full_query, maxResults=max(1, amount))
+                    .execute()
+                )
+                print(f"response for query '{full_query}':", response)
+                if response.get("messages"):
+                    return response.get("messages", [])
+            except Exception as e:
+                print(f"Query failed: {e}")
+                continue
+        return []
+    
     if normalized_dates:
         for date_value in normalized_dates:
-            query = f"{filter_query} {_date_query(date_value)}"
-            response = (
-                service.users()
-                .messages()
-                .list(userId="me", q=query, maxResults=max(1, amount))
-                .execute()
-            )
-            for item in response.get("messages", []) or []:
+            date_filter = _date_query(date_value)
+            items = try_queries(filter_queries, date_filter)
+            for item in items:
+                print("item:", item)
                 msg_id = item.get("id")
                 if msg_id and msg_id not in seen_ids:
                     seen_ids.add(msg_id)
                     collected.append({"id": msg_id})
     else:
-        response = (
-            service.users()
-            .messages()
-            .list(userId="me", q=filter_query, maxResults=max(1, amount))
-            .execute()
-        )
-        for item in response.get("messages", []) or []:
+        items = try_queries(filter_queries)
+        for item in items:
+            print("item:", item)
             msg_id = item.get("id")
             if msg_id and msg_id not in seen_ids:
                 seen_ids.add(msg_id)
                 collected.append({"id": msg_id})
 
     if not collected:
+        print("No emails found.")
         return {"status": "success", "count": 0, "emails": [], "requested_by": user_email, "of_user": of_user, "dates": normalized_dates, "amount": amount}
 
     emails: list[dict] = []
@@ -85,6 +121,7 @@ def read_emails(service, user_email: str, of_user: str, dates: Iterable[str] | s
             .get(userId="me", id=item["id"], format="metadata", metadataHeaders=["From", "Subject", "Date"])
             .execute()
         )
+        print("message:", message)
         headers = _extract_headers(message.get("payload", {}).get("headers", []))
         emails.append(
             {
@@ -96,6 +133,7 @@ def read_emails(service, user_email: str, of_user: str, dates: Iterable[str] | s
                 "snippet": message.get("snippet", ""),
             }
         )
+        print("Extracted email:", emails[-1])
 
     return {
         "status": "success",
@@ -108,13 +146,14 @@ def read_emails(service, user_email: str, of_user: str, dates: Iterable[str] | s
     }
 
 
-def read_user_emails(db, user_id: int, of_user: str, dates: Iterable[str] | str | None, amount: int = 5) -> Tuple[bool, dict]:
+def read_user_emails(db, user_id: int, of_user: str, dates: Iterable[str] | str | None = None, amount: int | None = None) -> Tuple[bool, dict]:
     """Read matching Gmail messages for a user from the given sender and date filter."""
     try:
         service = get_gmail_service(db, user_id)
         profile = service.users().getProfile(userId="me").execute()
         user_email = profile.get("emailAddress", "")
         result = read_emails(service, user_email, of_user, dates, amount)
+        print("read_user_emails result:", result)
         return True, result
     except HttpError as e:
         return False, {"status": "error", "detail": e.content.decode() if hasattr(e, "content") else str(e)}

@@ -156,31 +156,40 @@ export default function Dashboard() {
     const form = new FormData(e.target as HTMLFormElement);
     const ofUser = String(form.get("of_user") || "").trim();
     const datesRaw = String(form.get("dates") || "").trim();
-    const amount = Number(form.get("amount") || 5);
+    const amountRaw = String(form.get("amount") || "").trim();
+    
+    // Parse dates - optional, can be empty
     const dates = datesRaw
       .split(",")
       .map((date) => date.trim())
       .filter(Boolean);
+    
+    // Parse amount - optional, defaults to undefined if not provided (backend will use 1)
+    const amount = amountRaw ? Number(amountRaw) : undefined;
 
     if (!ofUser) {
-      setReadResult("Please provide the sender email.");
-      return;
-    }
-
-    if (!dates.length) {
-      setReadResult("Please enter at least one date in YYYY-MM-DD format.");
+      setReadResult("Error: Please provide the sender email or name.");
       return;
     }
 
     setReadLoading(true);
     try {
+      // Build request body - only include dates and amount if provided
+      const requestBody: { of_user: string; dates?: string[]; amount?: number } = { of_user: ofUser };
+      if (dates.length > 0) {
+        requestBody.dates = dates;
+      }
+      if (amount !== undefined) {
+        requestBody.amount = amount;
+      }
+
       const res = await fetch(`${API_URL}/api/gmail/read`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ of_user: ofUser, dates, amount }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await res.json();
@@ -190,12 +199,15 @@ export default function Dashboard() {
 
       const emailCount = data?.count ?? 0;
       const emailList = Array.isArray(data?.emails) ? data.emails : [];
+      const dateInfo = dates.length > 0 ? ` on ${dates.join(", ")}` : "";
+      const amountDisplay = amount ? ` (limit ${amount})` : " (latest result by default)";
       setReadResult(
-        `Found ${emailCount} email${emailCount === 1 ? "" : "s"} from ${ofUser}. ` +
+        `Found ${emailCount} email${emailCount === 1 ? "" : "s"} from ${ofUser}${dateInfo}${amountDisplay}. ` +
           (emailList.length ? JSON.stringify(emailList.slice(0, 5), null, 2) : "No matching emails found.")
       );
     } catch (err) {
-      setReadResult("Error: " + (err instanceof Error ? err.message : String(err)));
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      setReadResult("Error: " + errorMsg);
     } finally {
       setReadLoading(false);
     }
@@ -316,21 +328,20 @@ export default function Dashboard() {
 
           <form onSubmit={readGmailEmails} className="mt-4 space-y-3">
             <div>
-              <label className="mb-1 block text-sm text-slate-700">Email of user</label>
-              <input name="of_user" type="email" className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900" placeholder="sender@example.com" required />
+              <label className="mb-1 block text-sm text-slate-700">Email or name of user <span className="text-red-600">*</span></label>
+              <input name="of_user" className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900" placeholder="sender@example.com or John Doe" required />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-slate-700">Dates</label>
+              <label className="mb-1 block text-sm text-slate-700">Dates <span className="text-gray-400 text-xs">(optional)</span></label>
               <input
                 name="dates"
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900"
-                placeholder="2026-08-01, 2026-08-03"
-                required
+                placeholder="2026-08-01, 2026-08-03 (leave empty for all emails)"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-slate-700">Amount</label>
-              <input name="amount" type="number" min={1} max={50} defaultValue={5} className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900" required />
+              <label className="mb-1 block text-sm text-slate-700">Amount <span className="text-gray-400 text-xs">(optional, defaults to 1)</span></label>
+              <input name="amount" type="number" min={1} max={50} className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900" placeholder="5" />
             </div>
 
             <div className="flex items-center gap-3">

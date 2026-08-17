@@ -23,8 +23,16 @@ def send_email_tool(user_id: str, to: str, subject: str, body: str) -> Dict[str,
         db.close()
 
 
-def read_emails_tool(user_id: str, of_user: str, dates: list[str] | str, amount: int = 5) -> Dict[str, Any]:
-    """Return matching Gmail messages from a specific sender and date list."""
+def read_emails_tool(user_id: str, of_user: str, dates: list[str] | str | None = None, amount: int | None = None) -> Dict[str, Any]:
+    """Return matching Gmail messages from a specific sender.
+    
+    Args:
+        user_id: The user's ID
+        of_user: Email address or name of the person whose emails to search for
+        dates: Optional list of dates in ISO format (e.g., ['2026-08-16', '2026-08-17']). 
+               If not provided, searches all emails.
+        amount: Optional number of emails to return. Defaults to 1 (latest result) if not provided.
+    """
     db: Session = SessionLocal()
     try:
         ok, payload = read_user_emails(db, int(user_id), of_user, dates, amount)
