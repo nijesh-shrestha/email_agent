@@ -23,6 +23,19 @@ export type AgentMessage = {
   text: string;
 };
 
+interface ScheduledEmail {
+  id: number;
+  recipient: string;
+  subject: string;
+  body: string;
+  scheduled_date: string;
+  status: string;
+  created_at: string;
+  sent_at?: string | null;
+  error_message?: string | null;
+  message_id?: string | null;
+}
+
 export default function Dashboard() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,6 +50,9 @@ export default function Dashboard() {
   const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentError, setAgentError] = useState<string | null>(null);
+  const [scheduledEmails, setScheduledEmails] = useState<ScheduledEmail[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleResult, setScheduleResult] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -265,6 +281,102 @@ export default function Dashboard() {
     }
   }
 
+  async function fetchScheduledEmails() {
+    const token = window.localStorage.getItem("email_agent_token");
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/scheduled-emails/list`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setScheduledEmails(data.scheduled_emails || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch scheduled emails:", err);
+    }
+  }
+
+  async function scheduleEmail(e: React.FormEvent) {
+    e.preventDefault();
+    setScheduleResult(null);
+    const token = window.localStorage.getItem("email_agent_token");
+    if (!token) return router.replace("/login");
+
+    const form = new FormData(e.target as HTMLFormElement);
+    const to = form.get("schedule_to") as string;
+    const subject = form.get("schedule_subject") as string;
+    const body = form.get("schedule_body") as string;
+    const scheduledDate = form.get("schedule_date") as string;
+
+    if (!to || !subject || !body || !scheduledDate) {
+      setScheduleResult("Error: All fields are required");
+      return;
+    }
+
+    setScheduleLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/scheduled-emails/schedule`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ to, subject, body, scheduled_date: scheduledDate }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to schedule email");
+      }
+
+      setScheduleResult(`Success: Email scheduled for ${new Date(data.scheduled_date).toLocaleString()}`);
+      fetchScheduledEmails();
+      (e.target as HTMLFormElement).reset();
+    } catch (err) {
+      setScheduleResult("Error: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setScheduleLoading(false);
+    }
+  }
+
+  async function cancelScheduledEmail(emailId: number) {
+    const token = window.localStorage.getItem("email_agent_token");
+    if (!token) return router.replace("/login");
+
+    try {
+      const res = await fetch(`${API_URL}/api/scheduled-emails/${emailId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        fetchScheduledEmails();
+      } else {
+        const data = await res.json();
+        alert(data.detail || "Failed to cancel scheduled email");
+      }
+    } catch {
+      alert("Failed to cancel scheduled email");
+    }
+  }
+
+  // Fetch scheduled emails on component mount
+  useEffect(() => {
+    if (!user) return;
+
+    const token = window.localStorage.getItem("email_agent_token");
+    if (!token) return;
+
+    fetch(`${API_URL}/api/scheduled-emails/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => setScheduledEmails(data.scheduled_emails || []))
+      .catch((err) => console.error("Failed to fetch scheduled emails:", err));
+  }, [user]);
+
   if (loading) {
     return <main className="flex min-h-screen items-center justify-center">Loading...</main>;
   }
@@ -364,7 +476,7 @@ export default function Dashboard() {
           <form onSubmit={sendAgentMessage} className="mt-4 space-y-3">
             <div>
               <label className="mb-1 block text-sm text-slate-700" htmlFor="agentPrompt">
-                Ask the agent to draft, review, or send an email
+                Ask the agent to draft, review, send, or schedule an email
               </label>
               <textarea
                 id="agentPrompt"
@@ -372,7 +484,7 @@ export default function Dashboard() {
                 onChange={(event) => setAgentPrompt(event.target.value)}
                 rows={5}
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900"
-                placeholder="Compose an email to the team asking for the project update..."
+                placeholder="Schedule an email to john@example.com for tomorrow at 3pm about the meeting..."
                 required
               />
             </div>
@@ -415,6 +527,98 @@ export default function Dashboard() {
               ))}
             </div>
           ) : null}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">Schedule Email</p>
+
+          <form onSubmit={scheduleEmail} className="mt-4 space-y-3">
+            <div>
+              <label className="mb-1 block text-sm text-slate-700">To</label>
+              <input name="schedule_to" type="email" className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900" required />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-700">Subject</label>
+              <input name="schedule_subject" className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900" required />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-700">Body</label>
+              <textarea name="schedule_body" rows={4} className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900" required />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-700">Schedule Date & Time (UTC)</label>
+              <input
+                name="schedule_date"
+                type="datetime-local"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900"
+                required
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button type="submit" disabled={scheduleLoading} className="rounded bg-purple-600 px-4 py-2 text-white disabled:opacity-70">
+                {scheduleLoading ? "Scheduling..." : "Schedule email"}
+              </button>
+
+              {scheduleResult ? <p className="text-sm text-slate-700">{scheduleResult}</p> : null}
+            </div>
+          </form>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">Scheduled Emails</p>
+            <button
+              onClick={() => fetchScheduledEmails()}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Refresh
+            </button>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {scheduledEmails.length === 0 ? (
+              <p className="text-sm text-slate-500">No scheduled emails</p>
+            ) : (
+              scheduledEmails.map((email) => (
+                <div
+                  key={email.id}
+                  className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-900">To: {email.recipient}</p>
+                      <p className="text-sm text-slate-700">Subject: {email.subject}</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Scheduled: {new Date(email.scheduled_date).toLocaleString()}
+                      </p>
+                      <span
+                        className={`inline-block mt-2 rounded px-2 py-0.5 text-xs font-medium ${
+                          email.status === "pending"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : email.status === "sent"
+                            ? "bg-green-100 text-green-800"
+                            : email.status === "failed"
+                            ? "bg-red-100 text-red-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {email.status}
+                      </span>
+                    </div>
+                    {email.status === "pending" && (
+                      <button
+                        onClick={() => cancelScheduledEmail(email.id)}
+                        className="ml-4 text-sm text-red-600 hover:underline"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </main>
