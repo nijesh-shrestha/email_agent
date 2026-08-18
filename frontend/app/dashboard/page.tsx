@@ -369,12 +369,30 @@ export default function Dashboard() {
     const token = window.localStorage.getItem("email_agent_token");
     if (!token) return;
 
-    fetch(`${API_URL}/api/scheduled-emails/list`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => setScheduledEmails(data.scheduled_emails || []))
-      .catch((err) => console.error("Failed to fetch scheduled emails:", err));
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/scheduled-emails/list`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) {
+          return;
+        }
+
+        const data = await res.json();
+        if (!cancelled) {
+          setScheduledEmails(data.scheduled_emails || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch scheduled emails:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   if (loading) {

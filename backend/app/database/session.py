@@ -50,6 +50,6 @@ def get_db() -> Generator[Session, None, None]:
 
 def init_db() -> None:
     from app.database.base import Base
-    from app.database.models import ChatSession, Message, OAuthAccount, User
+    from app.database.models import ChatSession, Message, OAuthAccount, ScheduledEmail, User
 
     Base.metadata.create_all(bind=engine)

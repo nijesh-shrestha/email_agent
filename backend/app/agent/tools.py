@@ -110,7 +110,7 @@ def schedule_email_tool(
 
         # Create the scheduled email record
         scheduled_email = ScheduledEmail(
-            user_id=int(user_id),
+            user_id=str(user_id),
             recipient=to,
             subject=subject,
             body=body,
@@ -138,24 +138,32 @@ def schedule_email_tool(
         db.close()
 
 
-def get_scheduled_emails_tool(user_id: str) -> Dict[str, Any]:
-    """Retrieve all pending scheduled emails for a user.
+def get_scheduled_emails_tool(user_id: str, status: str | None = None) -> Dict[str, Any]:
+    """Retrieve scheduled emails for a user, optionally filtered by status.
 
     Args:
         user_id: The user's ID
+        status: Optional status filter (pending, sent, cancelled, failed)
 
     Returns:
         Dict with list of scheduled emails
     """
     db: Session = SessionLocal()
     try:
-        scheduled_emails = (
-            db.query(ScheduledEmail)
-            .filter(ScheduledEmail.user_id == int(user_id))
-            .filter(ScheduledEmail.status == ScheduledEmailStatus.PENDING)
-            .order_by(ScheduledEmail.scheduled_date)
-            .all()
-        )
+        query = db.query(ScheduledEmail).filter(ScheduledEmail.user_id == str(user_id))
+
+        if status:
+            try:
+                status_enum = ScheduledEmailStatus(status.lower())
+                query = query.filter(ScheduledEmail.status == status_enum)
+            except ValueError:
+                valid_statuses = [s.value for s in ScheduledEmailStatus]
+                return {
+                    "success": False,
+                    "error": f"Invalid status. Must be one of: {valid_statuses}",
+                }
+
+        scheduled_emails = query.order_by(ScheduledEmail.scheduled_date).all()
 
         return {
             "success": True,
@@ -165,8 +173,13 @@ def get_scheduled_emails_tool(user_id: str) -> Dict[str, Any]:
                     "id": email.id,
                     "recipient": email.recipient,
                     "subject": email.subject,
+                    "body": email.body,
                     "scheduled_date": email.scheduled_date.isoformat(),
+                    "status": email.status.value,
                     "created_at": email.created_at.isoformat(),
+                    "sent_at": email.sent_at.isoformat() if email.sent_at else None,
+                    "error_message": email.error_message,
+                    "message_id": email.message_id,
                 }
                 for email in scheduled_emails
             ],
@@ -190,7 +203,7 @@ def cancel_scheduled_email_tool(user_id: str, scheduled_email_id: int) -> Dict[s
         scheduled_email = (
             db.query(ScheduledEmail)
             .filter(ScheduledEmail.id == scheduled_email_id)
-            .filter(ScheduledEmail.user_id == int(user_id))
+            .filter(ScheduledEmail.user_id == str(user_id))
             .filter(ScheduledEmail.status == ScheduledEmailStatus.PENDING)
             .first()
         )
@@ -213,6 +226,47 @@ def cancel_scheduled_email_tool(user_id: str, scheduled_email_id: int) -> Dict[s
     except Exception as e:
         db.rollback()
         return {"success": False, "error": str(e)}
+    finally:
+        db.close()
+
+
+def get_scheduled_email_by_id_tool(user_id: str, scheduled_email_id: int) -> Dict[str, Any]:
+    """Get details of a specific scheduled email.
+
+    Args:
+        user_id: The user's ID
+        scheduled_email_id: ID of the scheduled email to retrieve
+
+    Returns:
+        Dict with scheduled email details
+    """
+    db: Session = SessionLocal()
+    try:
+        scheduled_email = (
+            db.query(ScheduledEmail)
+            .filter(ScheduledEmail.id == scheduled_email_id)
+            .filter(ScheduledEmail.user_id == str(user_id))
+            .first()
+        )
+
+        if not scheduled_email:
+            return {"success": False, "error": "Scheduled email not found"}
+
+        return {
+            "success": True,
+            "scheduled_email": {
+                "id": scheduled_email.id,
+                "recipient": scheduled_email.recipient,
+                "subject": scheduled_email.subject,
+                "body": scheduled_email.body,
+                "scheduled_date": scheduled_email.scheduled_date.isoformat(),
+                "status": scheduled_email.status.value,
+                "created_at": scheduled_email.created_at.isoformat(),
+                "sent_at": scheduled_email.sent_at.isoformat() if scheduled_email.sent_at else None,
+                "error_message": scheduled_email.error_message,
+                "message_id": scheduled_email.message_id,
+            },
+        }
     finally:
         db.close()
 

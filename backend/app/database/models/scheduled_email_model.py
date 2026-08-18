@@ -27,7 +27,7 @@ class ScheduledEmail(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    user_id: Mapped[int] = mapped_column(
+    user_id: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
         index=True,
