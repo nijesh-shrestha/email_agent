@@ -54,10 +54,6 @@ def read_emails(service, user_email: str, of_user: str, dates: Iterable[str] | s
     # Default amount to 1 if not provided
     if amount is None:
         amount = 1
-    
-    print("normalized_dates:", normalized_dates)
-    print("amount:", amount)
-    print("of_user:", of_user)
 
     # Build the from query - handle both email and name
     # If of_user contains @, treat as email; otherwise treat as name/partial match
@@ -82,11 +78,9 @@ def read_emails(service, user_email: str, of_user: str, dates: Iterable[str] | s
                     .list(userId="me", q=full_query, maxResults=max(1, amount))
                     .execute()
                 )
-                print(f"response for query '{full_query}':", response)
                 if response.get("messages"):
                     return response.get("messages", [])
             except Exception as e:
-                print(f"Query failed: {e}")
                 continue
         return []
     
@@ -95,7 +89,6 @@ def read_emails(service, user_email: str, of_user: str, dates: Iterable[str] | s
             date_filter = _date_query(date_value)
             items = try_queries(filter_queries, date_filter)
             for item in items:
-                print("item:", item)
                 msg_id = item.get("id")
                 if msg_id and msg_id not in seen_ids:
                     seen_ids.add(msg_id)
@@ -103,14 +96,12 @@ def read_emails(service, user_email: str, of_user: str, dates: Iterable[str] | s
     else:
         items = try_queries(filter_queries)
         for item in items:
-            print("item:", item)
             msg_id = item.get("id")
             if msg_id and msg_id not in seen_ids:
                 seen_ids.add(msg_id)
                 collected.append({"id": msg_id})
 
     if not collected:
-        print("No emails found.")
         return {"status": "success", "count": 0, "emails": [], "requested_by": user_email, "of_user": of_user, "dates": normalized_dates, "amount": amount}
 
     emails: list[dict] = []
@@ -121,7 +112,6 @@ def read_emails(service, user_email: str, of_user: str, dates: Iterable[str] | s
             .get(userId="me", id=item["id"], format="metadata", metadataHeaders=["From", "Subject", "Date"])
             .execute()
         )
-        print("message:", message)
         headers = _extract_headers(message.get("payload", {}).get("headers", []))
         emails.append(
             {
@@ -133,7 +123,6 @@ def read_emails(service, user_email: str, of_user: str, dates: Iterable[str] | s
                 "snippet": message.get("snippet", ""),
             }
         )
-        print("Extracted email:", emails[-1])
 
     return {
         "status": "success",

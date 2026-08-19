@@ -6,6 +6,12 @@ from sqlalchemy.orm import Session
 from app.database.session import SessionLocal
 from app.database.models import User, ScheduledEmail, ScheduledEmailStatus
 from app.services.gmail_service import read_user_emails, send_email
+from app.services.calendar_service import (
+    get_calendar_events,
+    get_event_by_date,
+    get_upcoming_events,
+    list_calendars,
+)
 
 
 def send_email_tool(user_id: str, to: str, subject: str, body: str) -> Dict[str, Any]:
@@ -267,6 +273,109 @@ def get_scheduled_email_by_id_tool(user_id: str, scheduled_email_id: int) -> Dic
                 "message_id": scheduled_email.message_id,
             },
         }
+    finally:
+        db.close()
+
+
+# --- Calendar Tools ---
+def get_calendar_events_tool(
+    user_id: str,
+    time_min: str | None = None,
+    time_max: str | None = None,
+    max_results: int = 10,
+    calendar_id: str = "primary",
+) -> Dict[str, Any]:
+    """Retrieve events from the user's Google Calendar.
+
+    Args:
+        user_id: The user's ID
+        time_min: ISO format datetime string for start of range (optional)
+        time_max: ISO format datetime string for end of range (optional)
+        max_results: Maximum number of events to return (default: 10)
+        calendar_id: Calendar ID to query (default: 'primary')
+
+    Returns:
+        Dict with list of calendar events
+    """
+    db: Session = SessionLocal()
+    try:
+        ok, payload = get_calendar_events(
+            db, int(user_id), time_min, time_max, max_results, calendar_id
+        )
+        if ok:
+            return {"success": True, **payload}
+        return {"success": False, **payload}
+    finally:
+        db.close()
+
+
+def get_event_by_date_tool(
+    user_id: str,
+    date: str,
+    calendar_id: str = "primary",
+) -> Dict[str, Any]:
+    """Retrieve events for a specific date.
+
+    Args:
+        user_id: The user's ID
+        date: Date in ISO format (YYYY-MM-DD, e.g., '2026-08-18')
+        calendar_id: Calendar ID to query (default: 'primary')
+
+    Returns:
+        Dict with list of events for the specified date
+    """
+    db: Session = SessionLocal()
+    try:
+        ok, payload = get_event_by_date(db, int(user_id), date, calendar_id)
+        if ok:
+            return {"success": True, **payload}
+        return {"success": False, **payload}
+    finally:
+        db.close()
+
+
+def get_upcoming_events_tool(
+    user_id: str,
+    days: int = 7,
+    max_results: int = 20,
+    calendar_id: str = "primary",
+) -> Dict[str, Any]:
+    """Retrieve upcoming events for the next N days.
+
+    Args:
+        user_id: The user's ID
+        days: Number of days to look ahead (default: 7)
+        max_results: Maximum number of events to return (default: 20)
+        calendar_id: Calendar ID to query (default: 'primary')
+
+    Returns:
+        Dict with list of upcoming events
+    """
+    db: Session = SessionLocal()
+    try:
+        ok, payload = get_upcoming_events(db, int(user_id), days, max_results, calendar_id)
+        if ok:
+            return {"success": True, **payload}
+        return {"success": False, **payload}
+    finally:
+        db.close()
+
+
+def list_calendars_tool(user_id: str) -> Dict[str, Any]:
+    """List all calendars the user has access to.
+
+    Args:
+        user_id: The user's ID
+
+    Returns:
+        Dict with list of available calendars
+    """
+    db: Session = SessionLocal()
+    try:
+        ok, payload = list_calendars(db, int(user_id))
+        if ok:
+            return {"success": True, **payload}
+        return {"success": False, **payload}
     finally:
         db.close()
 
