@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardContent, Button, Input, Badge } from "@/components/ui";
+import { formatNptDateTime } from "@/lib/timezone";
 
 interface CalendarEvent {
   id: string;
@@ -168,7 +169,7 @@ export function UpcomingEventsView({ apiUrl, token, defaultDays = 7 }: UpcomingE
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      {new Date(event.start).toLocaleString()} - {new Date(event.end).toLocaleString()}
+                      {formatNptDateTime(event.start)} - {formatNptDateTime(event.end)} NPT
                     </p>
                     {event.description && (
                       <p className="text-sm text-slate-500 mt-2 line-clamp-2">{event.description}</p>

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Card, CardHeader, CardContent, Button, Input, Textarea } from "@/components/ui";
+import { formatNptDateTime, nptInputToUtc, toNptDateTimeInput } from "@/lib/timezone";
 
 interface ScheduledEmailFormProps {
   apiUrl: string;
@@ -46,13 +47,14 @@ export function ScheduleEmailForm({ apiUrl, token, onSuccess }: ScheduledEmailFo
     setScheduleResult(null);
 
     try {
+      const scheduledDateUtc = nptInputToUtc(formData.scheduled_date);
       const res = await fetch(`${apiUrl}/api/scheduled-emails/schedule`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, scheduled_date: scheduledDateUtc }),
       });
 
       const data = await res.json();
@@ -60,7 +62,7 @@ export function ScheduleEmailForm({ apiUrl, token, onSuccess }: ScheduledEmailFo
         throw new Error(data?.detail || "Failed to schedule email");
       }
 
-      setScheduleResult(`✓ Success: Email scheduled for ${new Date(data.scheduled_date).toLocaleString()}`);
+      setScheduleResult(`✓ Success: Email scheduled for ${formatNptDateTime(data.scheduled_date)} NPT`);
       setFormData({ to: "", subject: "", body: "", scheduled_date: "" });
       onSuccess?.();
     } catch (err) {
@@ -82,7 +84,7 @@ export function ScheduleEmailForm({ apiUrl, token, onSuccess }: ScheduledEmailFo
   const defaultDate = new Date();
   defaultDate.setDate(defaultDate.getDate() + 1);
   defaultDate.setHours(9, 0, 0, 0);
-  const defaultDateString = defaultDate.toISOString().slice(0, 16);
+  const defaultDateString = toNptDateTimeInput(defaultDate);
 
   return (
     <Card>
@@ -120,7 +122,7 @@ export function ScheduleEmailForm({ apiUrl, token, onSuccess }: ScheduledEmailFo
           />
           <Input
             name="scheduled_date"
-            label="Schedule Date & Time (UTC)"
+            label="Schedule Date & Time (NPT)"
             type="datetime-local"
             value={formData.scheduled_date || defaultDateString}
             onChange={handleChange}

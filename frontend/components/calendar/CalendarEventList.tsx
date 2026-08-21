@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Card, CardHeader, CardContent, Button, Input, Select, Badge } from "@/components/ui";
+import { formatNptDate, formatNptDateTime } from "@/lib/timezone";
 
 interface CalendarEvent {
   id: string;
@@ -31,8 +32,8 @@ export function CalendarEventList({ apiUrl, token }: CalendarEventListProps) {
     endDate.setDate(startDate.getDate() + 7);
 
     return {
-      time_min: startDate.toISOString().split("T")[0],
-      time_max: endDate.toISOString().split("T")[0],
+      time_min: formatNptDate(startDate),
+      time_max: formatNptDate(endDate),
       max_results: "10",
       calendar_id: "primary",
     };
@@ -154,7 +155,7 @@ export function CalendarEventList({ apiUrl, token }: CalendarEventListProps) {
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        {new Date(event.start).toLocaleString()} - {new Date(event.end).toLocaleString()}
+                        {formatNptDateTime(event.start)} - {formatNptDateTime(event.end)} NPT
                       </p>
                       {event.description && (
                         <p className="text-sm text-slate-500 mt-2 line-clamp-2">{event.description}</p>
