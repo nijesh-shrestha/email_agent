@@ -1,5 +1,6 @@
 """Google Calendar service for interacting with the Calendar API."""
 
+import json
 from datetime import datetime, timezone
 from typing import Tuple
 
@@ -7,6 +8,22 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from app.services.google_oauth_service import get_google_credentials
+from app.utils.errors import InsufficientCalendarScopeError
+
+
+def _is_insufficient_scope_error(e: HttpError) -> bool:
+    """Check if an HttpError is due to insufficient OAuth scopes."""
+    try:
+        if e.resp.status == 403:
+            content = e.content.decode() if hasattr(e, "content") else str(e)
+            error_data = json.loads(content)
+            errors = error_data.get("error", {}).get("errors", [])
+            for err in errors:
+                if err.get("reason") == "insufficientPermissions":
+                    return True
+    except Exception:
+        pass
+    return False
 
 
 def get_calendar_service(db, user_id: int):
@@ -115,6 +132,12 @@ def get_calendar_events(
         }
 
     except HttpError as e:
+        if _is_insufficient_scope_error(e):
+            return False, {
+                "success": False,
+                "error": "insufficient_calendar_scope",
+                "message": "Google Calendar access requires additional permissions. Please reconnect your Google account to grant Calendar access.",
+            }
         return False, {
             "success": False,
             "error": e.content.decode() if hasattr(e, "content") else str(e),
@@ -226,6 +249,12 @@ def list_calendars(db, user_id: int) -> Tuple[bool, dict]:
         }
 
     except HttpError as e:
+        if _is_insufficient_scope_error(e):
+            return False, {
+                "success": False,
+                "error": "insufficient_calendar_scope",
+                "message": "Google Calendar access requires additional permissions. Please reconnect your Google account to grant Calendar access.",
+            }
         return False, {
             "success": False,
             "error": e.content.decode() if hasattr(e, "content") else str(e),
