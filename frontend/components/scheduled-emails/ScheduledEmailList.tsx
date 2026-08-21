@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardHeader, CardContent, Button, Badge } from "@/components/ui";
 
 interface ScheduledEmail {
@@ -25,29 +25,82 @@ interface ScheduledEmailListProps {
 export function ScheduledEmailList({ apiUrl, token, onRefresh }: ScheduledEmailListProps) {
   const [scheduledEmails, setScheduledEmails] = useState<ScheduledEmail[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [cancelLoadingId, setCancelLoadingId] = useState<number | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState<number | null>(null);
 
   const fetchScheduledEmails = async () => {
     setLoading(true);
+    setError(null);
+
     try {
       const res = await fetch(`${apiUrl}/api/scheduled-emails/list`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
+
+      if (!res.ok) {
         const data = await res.json();
-        setScheduledEmails(data.scheduled_emails || []);
+        setError(data.detail || "Failed to fetch scheduled emails");
+        return;
       }
+
+      const data = await res.json();
+      setScheduledEmails(data.scheduled_emails || []);
     } catch (err) {
       console.error("Failed to fetch scheduled emails:", err);
+      setError("Failed to fetch scheduled emails. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchScheduledEmails();
+    let active = true;
+
+    const loadScheduledEmails = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const res = await fetch(`${apiUrl}/api/scheduled-emails/list`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!active) return;
+
+        if (!res.ok) {
+          const data = await res.json();
+          if (active) setError(data.detail || "Failed to fetch scheduled emails");
+          return;
+        }
+
+        const data = await res.json();
+        if (active) setScheduledEmails(data.scheduled_emails || []);
+      } catch (err) {
+        console.error("Failed to fetch scheduled emails:", err);
+        if (active) {
+          setError("Failed to fetch scheduled emails. Please try again.");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadScheduledEmails();
+
+    return () => {
+      active = false;
+    };
   }, [apiUrl, token]);
 
-  const cancelScheduledEmail = async (emailId: number) => {
+  const handleCancelClick = (emailId: number) => {
+    setShowCancelConfirm(emailId);
+  };
+
+  const confirmCancel = async (emailId: number) => {
+    setCancelLoadingId(emailId);
     try {
       const res = await fetch(`${apiUrl}/api/scheduled-emails/${emailId}`, {
         method: "DELETE",
@@ -63,6 +116,9 @@ export function ScheduledEmailList({ apiUrl, token, onRefresh }: ScheduledEmailL
       }
     } catch {
       alert("Failed to cancel scheduled email");
+    } finally {
+      setCancelLoadingId(null);
+      setShowCancelConfirm(null);
     }
   };
 
@@ -81,6 +137,29 @@ export function ScheduledEmailList({ apiUrl, token, onRefresh }: ScheduledEmailL
     }
   };
 
+  const formatDateWithTimezone = (dateString: string) => {
+    const date = new Date(dateString);
+    return `${date.toLocaleString()} (local)`;
+  };
+
+  if (loading && scheduledEmails.length === 0) {
+    return (
+      <Card>
+        <CardHeader
+          title="Scheduled Emails"
+          action={
+            <Button variant="ghost" size="sm" onClick={fetchScheduledEmails} disabled={loading}>
+              {loading ? "Refreshing..." : "Refresh"}
+            </Button>
+          }
+        />
+        <CardContent>
+          <p className="text-sm text-slate-500 text-center py-4">Loading...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader
@@ -92,9 +171,17 @@ export function ScheduledEmailList({ apiUrl, token, onRefresh }: ScheduledEmailL
         }
       />
       <CardContent>
-        {loading ? (
-          <p className="text-sm text-slate-500 text-center py-4">Loading...</p>
-        ) : scheduledEmails.length === 0 ? (
+        {error && (
+          <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-200">
+            <p className="text-sm text-red-700" role="alert">
+              {error}
+            </p>
+            <Button variant="ghost" size="sm" className="mt-2" onClick={fetchScheduledEmails}>
+              Retry
+            </Button>
+          </div>
+        )}
+        {scheduledEmails.length === 0 && !error && !loading ? (
           <p className="text-sm text-slate-500 text-center py-4">No scheduled emails</p>
         ) : (
           <div className="space-y-3">
@@ -112,18 +199,50 @@ export function ScheduledEmailList({ apiUrl, token, onRefresh }: ScheduledEmailL
                       Subject: {email.subject}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
-                      Scheduled: {new Date(email.scheduled_date).toLocaleString()}
+                      Scheduled: {formatDateWithTimezone(email.scheduled_date)}
                     </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Created: {formatDateWithTimezone(email.created_at)}
+                    </p>
+                    {email.status === "failed" && email.error_message && (
+                      <p className="text-xs text-red-600 mt-1">
+                        Error: {email.error_message}
+                      </p>
+                    )}
                     {getStatusBadge(email.status)}
                   </div>
                   {email.status === "pending" && (
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => cancelScheduledEmail(email.id)}
-                    >
-                      Cancel
-                    </Button>
+                    <>
+                      {showCancelConfirm === email.id ? (
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-slate-700">Cancel this email?</p>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => confirmCancel(email.id)}
+                            loading={cancelLoadingId === email.id}
+                          >
+                            Yes, Cancel
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowCancelConfirm(null)}
+                            disabled={cancelLoadingId === email.id}
+                          >
+                            No
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleCancelClick(email.id)}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

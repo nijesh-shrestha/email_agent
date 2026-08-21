@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import LogoutButton from "@/components/logoutButton";
 import { SendEmailForm, ReadEmailForm } from "@/components/email";
@@ -9,6 +9,23 @@ import { AgentChat } from "@/components/agent";
 import { CalendarAgentChat, CalendarEventList, CalendarSelector, UpcomingEventsView } from "@/components/calendar";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+// Wrapper component that listens for refresh events and forces re-mount via key
+function ScheduledEmailListWithRefresh({ apiUrl, token }: { apiUrl: string; token: string }) {
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleRefresh = useCallback(() => {
+    setRefreshKey((prev) => prev + 1);
+  }, []);
+
+  useEffect(() => {
+    const handler = () => handleRefresh();
+    window.addEventListener("scheduled-email-refresh", handler);
+    return () => window.removeEventListener("scheduled-email-refresh", handler);
+  }, [handleRefresh]);
+
+  return <ScheduledEmailList key={refreshKey} apiUrl={apiUrl} token={token} />;
+}
 
 type UserProfile = {
   id: number;
@@ -40,6 +57,7 @@ export default function Dashboard() {
     }
 
     const storedToken = window.localStorage.getItem("email_agent_token");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Initial token load on mount is a standard pattern
     setToken(storedToken);
 
     if (!storedToken) {
@@ -183,8 +201,15 @@ export default function Dashboard() {
         <section aria-labelledby="scheduled-heading" className="lg:col-span-2 xl:col-span-3">
           <h2 id="scheduled-heading" className="sr-only">Scheduled Emails</h2>
           <div className="grid gap-6 lg:grid-cols-2">
-            <ScheduleEmailForm apiUrl={API_URL} token={currentToken} />
-            <ScheduledEmailList apiUrl={API_URL} token={currentToken} />
+            <ScheduleEmailForm
+              apiUrl={API_URL}
+              token={currentToken}
+              onSuccess={() => {
+                // Trigger refresh of scheduled emails list
+                window.dispatchEvent(new CustomEvent("scheduled-email-refresh"));
+              }}
+            />
+            <ScheduledEmailListWithRefresh apiUrl={API_URL} token={currentToken} />
           </div>
         </section>
 

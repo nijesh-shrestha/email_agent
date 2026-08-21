@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardContent, Button, Input, Badge } from "@/components/ui";
 
 interface CalendarEvent {
@@ -22,18 +22,20 @@ interface UpcomingEventsViewProps {
   defaultDays?: number;
 }
 
+interface UpcomingEventsResponse {
+  events?: CalendarEvent[];
+  detail?: string;
+}
+
 export function UpcomingEventsView({ apiUrl, token, defaultDays = 7 }: UpcomingEventsViewProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [days, setDays] = useState(defaultDays);
   const [maxResults, setMaxResults] = useState(20);
-  const [calendarId, setCalendarId] = useState("primary");
+  const calendarId = "primary";
 
-  const fetchEvents = async () => {
-    setLoading(true);
-    setError(null);
-
+  const fetchEvents = useCallback(async () => {
     try {
       const params = new URLSearchParams();
       params.append("days", days.toString());
@@ -44,31 +46,47 @@ export function UpcomingEventsView({ apiUrl, token, defaultDays = 7 }: UpcomingE
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const data = await res.json();
+      const data: UpcomingEventsResponse = await res.json();
       if (!res.ok) {
-        throw new Error(data?.detail || "Failed to fetch upcoming events");
+        let errorMessage = data?.detail || "Failed to fetch upcoming events";
+
+        // Handle insufficient calendar scope error specifically
+        if (res.status === 403 && errorMessage.includes("Calendar access")) {
+          errorMessage = "Google Calendar access requires additional permissions. Please reconnect your Google account to grant Calendar access.";
+        }
+
+        throw new Error(errorMessage);
       }
 
       setEvents(data.events || []);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiUrl, token, days, maxResults, calendarId]);
 
   useEffect(() => {
-    fetchEvents();
-  }, [apiUrl, token, days, maxResults, calendarId]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchEvents();
+  }, [fetchEvents]);
 
   const handleDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Math.max(1, Math.min(365, Number(e.target.value) || 1));
+    setLoading(true);
     setDays(value);
   };
 
   const handleMaxResultsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Math.max(1, Math.min(100, Number(e.target.value) || 1));
+    setLoading(true);
     setMaxResults(value);
+  };
+
+  const handleRefresh = () => {
+    setLoading(true);
+    void fetchEvents();
   };
 
   const getStatusBadge = (status: string) => {
@@ -109,7 +127,7 @@ export function UpcomingEventsView({ apiUrl, token, defaultDays = 7 }: UpcomingE
               onChange={handleMaxResultsChange}
               className="w-28"
             />
-            <Button variant="secondary" size="sm" onClick={fetchEvents} disabled={loading}>
+            <Button variant="secondary" size="sm" onClick={handleRefresh} disabled={loading}>
               {loading ? "Refreshing..." : "Refresh"}
             </Button>
           </div>

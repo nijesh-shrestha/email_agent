@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Card, CardHeader, CardContent, Button, Input, Select, Badge } from "@/components/ui";
 
 interface CalendarEvent {
@@ -25,11 +25,17 @@ export function CalendarEventList({ apiUrl, token }: CalendarEventListProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    time_min: "",
-    time_max: "",
-    max_results: "10",
-    calendar_id: "primary",
+  const [formData, setFormData] = useState(() => {
+    const startDate = new Date();
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 7);
+
+    return {
+      time_min: startDate.toISOString().split("T")[0],
+      time_max: endDate.toISOString().split("T")[0],
+      max_results: "10",
+      calendar_id: "primary",
+    };
   });
 
   const fetchEvents = async () => {
@@ -49,7 +55,14 @@ export function CalendarEventList({ apiUrl, token }: CalendarEventListProps) {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data?.detail || "Failed to fetch events");
+        let errorMessage = data?.detail || "Failed to fetch events";
+
+        // Handle insufficient calendar scope error specifically
+        if (res.status === 403 && errorMessage.includes("Calendar access")) {
+          errorMessage = "Google Calendar access requires additional permissions. Please reconnect your Google account to grant Calendar access.";
+        }
+
+        throw new Error(errorMessage);
       }
 
       setEvents(data.events || []);
@@ -65,10 +78,6 @@ export function CalendarEventList({ apiUrl, token }: CalendarEventListProps) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Set default date range to today
-  const today = new Date().toISOString().split("T")[0];
-  const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-
   return (
     <Card className="lg:col-span-2">
       <CardHeader title="Calendar Events" subtitle="View events from your Google Calendar" />
@@ -79,14 +88,14 @@ export function CalendarEventList({ apiUrl, token }: CalendarEventListProps) {
               name="time_min"
               label="Start Date"
               type="date"
-              value={formData.time_min || today}
+              value={formData.time_min}
               onChange={handleChange}
             />
             <Input
               name="time_max"
               label="End Date"
               type="date"
-              value={formData.time_max || nextWeek}
+              value={formData.time_max}
               onChange={handleChange}
             />
             <Input

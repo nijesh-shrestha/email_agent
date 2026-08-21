@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Card, CardHeader, CardContent, CardFooter, Button, Input, Textarea } from "@/components/ui";
+import { Card, CardHeader, CardContent, Button, Input, Textarea } from "@/components/ui";
 
 interface SendEmailFormProps {
   apiUrl: string;
@@ -99,14 +99,14 @@ export function SendEmailForm({ apiUrl, token, onSuccess }: SendEmailFormProps) 
             rows={6}
             required
           />
+          <div className="flex items-center gap-3 pt-2">
+            <Button type="submit" variant="primary" loading={sending} disabled={sending}>
+              {sending ? "Sending..." : "Send Email"}
+            </Button>
+            {sendResult && <p className="text-sm text-slate-700">{sendResult}</p>}
+          </div>
         </form>
       </CardContent>
-      <CardFooter>
-        <Button type="submit" variant="primary" loading={sending} disabled={sending}>
-          {sending ? "Sending..." : "Send Email"}
-        </Button>
-        {sendResult && <p className="text-sm text-slate-700">{sendResult}</p>}
-      </CardFooter>
     </Card>
   );
 }

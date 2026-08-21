@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Card, CardHeader, CardContent, Button, Select, Badge } from "@/components/ui";
+import React, { useState, useEffect, useCallback } from "react";
+import { Card, CardHeader, CardContent, Select, Badge } from "@/components/ui";
 
 interface Calendar {
   id: string;
@@ -19,37 +19,48 @@ interface CalendarSelectorProps {
   selectedCalendarId?: string;
 }
 
+interface CalendarListResponse {
+  calendars?: Calendar[];
+  detail?: string;
+}
+
 export function CalendarSelector({ apiUrl, token, onCalendarChange, selectedCalendarId = "primary" }: CalendarSelectorProps) {
   const [calendars, setCalendars] = useState<Calendar[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCalendar, setSelectedCalendar] = useState(selectedCalendarId);
 
-  const fetchCalendars = async () => {
-    setLoading(true);
-    setError(null);
-
+  const fetchCalendars = useCallback(async () => {
     try {
       const res = await fetch(`${apiUrl}/api/calendar/calendars`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const data = await res.json();
+      const data: CalendarListResponse = await res.json();
       if (!res.ok) {
-        throw new Error(data?.detail || "Failed to fetch calendars");
+        let errorMessage = data?.detail || "Failed to fetch calendars";
+
+        // Handle insufficient calendar scope error specifically
+        if (res.status === 403 && errorMessage.includes("Calendar access")) {
+          errorMessage = "Google Calendar access requires additional permissions. Please reconnect your Google account to grant Calendar access.";
+        }
+
+        throw new Error(errorMessage);
       }
 
       setCalendars(data.calendars || []);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiUrl, token]);
 
   useEffect(() => {
-    fetchCalendars();
-  }, [apiUrl, token]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchCalendars();
+  }, [fetchCalendars]);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const calendarId = e.target.value;

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Card, CardHeader, CardContent, CardFooter, Button, Textarea, Input, Badge } from "@/components/ui";
+import React, { useState } from "react";
+import { Card, CardHeader, CardContent, CardFooter, Button, Textarea } from "@/components/ui";
 
 interface AgentMessage {
   role: "user" | "model" | "tool";
@@ -9,13 +9,13 @@ interface AgentMessage {
 }
 
 interface AgentEventPart {
-  text: string | null;
-  thought: boolean | null;
-  function_call: any;
-  function_response: any;
-  tool_call: any;
-  tool_response: any;
-  part_metadata: any;
+  text?: string | null;
+  thought?: boolean | null;
+  function_call?: Record<string, unknown> | null;
+  function_response?: Record<string, unknown> | null;
+  tool_call?: Record<string, unknown> | null;
+  tool_response?: Record<string, unknown> | null;
+  part_metadata?: Record<string, unknown> | null;
 }
 
 interface AgentEvent {
@@ -23,6 +23,11 @@ interface AgentEvent {
   invocation_id: string | null;
   partial: boolean;
   content: AgentEventPart[];
+}
+
+interface CalendarRunResponse {
+  session_id: string | null;
+  events?: AgentEvent[];
 }
 
 interface CalendarAgentChatProps {
@@ -58,11 +63,24 @@ export function CalendarAgentChat({ apiUrl, token }: CalendarAgentChatProps) {
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || "Calendar agent request failed");
+        let errorMessage = "Calendar agent request failed";
+        try {
+          const errData = await res.json();
+          errorMessage = errData.detail || errData.message || errorMessage;
+        } catch {
+          const errText = await res.text();
+          errorMessage = errText || errorMessage;
+        }
+
+        // Handle insufficient calendar scope error specifically
+        if (res.status === 403 && errorMessage.includes("Calendar access")) {
+          errorMessage = "Google Calendar access requires additional permissions. Please reconnect your Google account to grant Calendar access.";
+        }
+
+        throw new Error(errorMessage);
       }
 
-      const data = await res.json();
+      const data: CalendarRunResponse = await res.json();
       setAgentSessionId(data.session_id);
 
       const nextMessages: AgentMessage[] = [];
@@ -107,7 +125,7 @@ export function CalendarAgentChat({ apiUrl, token }: CalendarAgentChatProps) {
         subtitle="Ask about your calendar events, upcoming meetings, and available calendars"
       />
       <CardContent>
-        <form onSubmit={sendAgentMessage} className="space-y-4">
+        <form id="calendar-agent-form" onSubmit={sendAgentMessage} className="space-y-4">
           <Textarea
             label="Ask the calendar agent"
             placeholder="What's on my calendar today? / Show me upcoming events / List all calendars..."
