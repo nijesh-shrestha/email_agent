@@ -14,7 +14,6 @@ from app.services.calendar_service import (
     get_upcoming_events,
     list_calendars,
 )
-from app.utils.errors import InsufficientCalendarScopeError
 
 router = APIRouter(prefix="/calendar", tags=["Calendar Agent"])
 

@@ -1,4 +1,3 @@
-import os
 from typing import Annotated
 
 import jwt
@@ -8,9 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.database.models import User
 from app.database.session import get_db
+from app.auth.settings import ALGORITHM, SECRET_KEY
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key")
-ALGORITHM = "HS256"
 security = HTTPBearer(auto_error=False)
 
 

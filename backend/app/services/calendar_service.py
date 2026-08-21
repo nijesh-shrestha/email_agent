@@ -8,7 +8,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from app.services.google_oauth_service import get_google_credentials
-from app.utils.errors import InsufficientCalendarScopeError
+from app.utils.timezone import NPT, parse_datetime_to_utc
 
 
 def _is_insufficient_scope_error(e: HttpError) -> bool:
@@ -62,27 +62,26 @@ def get_calendar_events(
 
         if time_min:
             try:
-                time_min_dt = datetime.fromisoformat(time_min.replace("Z", "+00:00"))
+                time_min_dt = parse_datetime_to_utc(time_min)
             except ValueError:
                 return False, {"error": f"Invalid time_min format: {time_min}"}
 
         if time_max:
             try:
-                time_max_dt = datetime.fromisoformat(time_max.replace("Z", "+00:00"))
+                time_max_dt = parse_datetime_to_utc(time_max)
             except ValueError:
                 return False, {"error": f"Invalid time_max format: {time_max}"}
 
         # Default to today if no time range specified
         if not time_min_dt:
-            time_min_dt = datetime.now(timezone.utc).replace(
+            now_npt = datetime.now(NPT)
+            time_min_dt = now_npt.replace(
                 hour=0, minute=0, second=0, microsecond=0
-            )
+            ).astimezone(timezone.utc)
 
         if not time_max_dt:
             # Default to 7 days from time_min
-            time_max_dt = time_min_dt.replace(
-                hour=23, minute=59, second=59
-            )  # End of same day
+            time_max_dt = time_min_dt.replace(hour=23, minute=59, second=59)
 
         # Call the Calendar API
         events_result = (
@@ -165,9 +164,9 @@ def get_event_by_date(
     """
     try:
         # Parse the date and set time boundaries
-        target_date = datetime.strptime(date, "%Y-%m-%d")
-        time_min = target_date.replace(hour=0, minute=0, second=0, tzinfo=timezone.utc)
-        time_max = target_date.replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
+        target_date = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=NPT)
+        time_min = target_date.replace(hour=0, minute=0, second=0).astimezone(timezone.utc)
+        time_max = target_date.replace(hour=23, minute=59, second=59).astimezone(timezone.utc)
 
         return get_calendar_events(
             db,
@@ -202,7 +201,7 @@ def get_upcoming_events(
     """
     from datetime import timedelta
 
-    time_min = datetime.now(timezone.utc)
+    time_min = datetime.now(NPT)
     time_max = time_min + timedelta(days=days)
 
     return get_calendar_events(

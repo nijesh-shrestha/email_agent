@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, String, Text, Enum
@@ -63,7 +63,8 @@ class ScheduledEmail(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
+        default=datetime.now(timezone.utc),
+        nullable=False,
     )
 
     sent_at: Mapped[datetime | None] = mapped_column(

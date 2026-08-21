@@ -10,6 +10,7 @@ from app.agent.tools import (
     cancel_scheduled_email_tool,
     get_scheduled_email_by_id_tool,
 )
+from app.utils.timezone import now_npt, parse_datetime_to_utc
 
 router = APIRouter()
 
@@ -31,21 +32,12 @@ class ScheduleEmailRequest(BaseModel):
     @classmethod
     def validate_date(cls, v):
         try:
-            # Parse the date
-            if v.endswith("Z"):
-                dt = datetime.fromisoformat(v.replace("Z", "+00:00"))
-            elif "+" in v or v.count("-") > 2:
-                dt = datetime.fromisoformat(v)
-            else:
-                dt = datetime.fromisoformat(v)
-
-            # Make timezone-naive for comparison
-            if dt.tzinfo is not None:
-                dt = dt.replace(tzinfo=None)
+            dt = parse_datetime_to_utc(v)
 
             # Ensure it's in the future
-            if dt <= datetime.utcnow():
+            if dt <= now_npt().astimezone(dt.tzinfo):
                 raise ValueError("Scheduled date must be in the future")
+
             return dt.isoformat()
         except ValueError:
             raise
@@ -81,6 +73,7 @@ def schedule_email_direct(
         body=request.body,
         scheduled_date=request.scheduled_date,
     )
+    print("schedule_email_direct result:", result)
 
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", "Failed to schedule email"))

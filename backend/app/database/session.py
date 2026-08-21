@@ -22,6 +22,9 @@ DATABASE_URL = get_database_url()
 engine_kwargs: dict[str, object] = {}
 if DATABASE_URL.startswith("sqlite"):
     engine_kwargs["connect_args"] = {"check_same_thread": False}
+elif DATABASE_URL.startswith("postgresql"):
+    engine_kwargs["connect_args"] = {"sslmode": "require", "connect_timeout": 10}
+    engine_kwargs["pool_recycle"] = 1800
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True, **engine_kwargs)
 

@@ -12,6 +12,7 @@ from app.services.calendar_service import (
     get_upcoming_events,
     list_calendars,
 )
+from app.utils.timezone import now_npt, parse_datetime_to_utc
 
 
 def send_email_tool(user_id: str, to: str, subject: str, body: str) -> Dict[str, Any]:
@@ -89,23 +90,12 @@ def schedule_email_tool(
 
         # Parse the scheduled date
         try:
-            # Handle both ISO format with and without timezone
-            if scheduled_date.endswith("Z"):
-                scheduled_dt = datetime.fromisoformat(scheduled_date.replace("Z", "+00:00"))
-            elif "+" in scheduled_date or scheduled_date.count("-") > 2:
-                scheduled_dt = datetime.fromisoformat(scheduled_date)
-            else:
-                # Assume local timezone if no timezone specified
-                scheduled_dt = datetime.fromisoformat(scheduled_date)
-
-            # Make timezone-naive for comparison
-            if scheduled_dt.tzinfo is not None:
-                scheduled_dt = scheduled_dt.replace(tzinfo=None)
+            scheduled_dt = parse_datetime_to_utc(scheduled_date)
         except ValueError as e:
             return {"success": False, "error": f"Invalid date format: {str(e)}"}
 
         # Ensure the scheduled date is in the future
-        now = datetime.utcnow()
+        now = now_npt().astimezone(scheduled_dt.tzinfo)
         if scheduled_dt <= now:
             return {
                 "success": False,
@@ -114,13 +104,16 @@ def schedule_email_tool(
                 "provided_time": scheduled_dt.isoformat(),
             }
 
+        # Convert to timezone-naive UTC for database storage
+        scheduled_dt_naive = scheduled_dt.replace(tzinfo=None)
+
         # Create the scheduled email record
         scheduled_email = ScheduledEmail(
             user_id=str(user_id),
             recipient=to,
             subject=subject,
             body=body,
-            scheduled_date=scheduled_dt,
+            scheduled_date=scheduled_dt_naive,
             status=ScheduledEmailStatus.PENDING,
         )
 
@@ -134,7 +127,7 @@ def schedule_email_tool(
             "recipient": to,
             "subject": subject,
             "scheduled_date": scheduled_dt.isoformat(),
-            "message": f"Email scheduled to be sent at {scheduled_dt.strftime('%Y-%m-%d %H:%M:%S')} UTC",
+            "message": f"Email scheduled to be sent at {scheduled_dt.astimezone(now_npt().tzinfo).strftime('%Y-%m-%d %H:%M:%S')} NPT",
         }
 
     except Exception as e:

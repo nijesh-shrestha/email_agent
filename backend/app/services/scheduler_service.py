@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.database.session import SessionLocal
 from app.database.models import ScheduledEmail, ScheduledEmailStatus
 from app.services.gmail_service import send_email
+from app.utils.timezone import now_npt
 
 logger = logging.getLogger(__name__)
 
@@ -57,15 +58,23 @@ class EmailScheduler:
         """Check for due scheduled emails and send them."""
         db = SessionLocal()
         try:
-            now = datetime.utcnow()
+            print("Checking for due scheduled emails...")
+            now = now_npt()
+
+            print(f"Current NPT time: {now.isoformat()}")
 
             # Find all pending emails that are due
+            # Database stores timezone-naive UTC values.
+            now_naive = now.astimezone(timezone.utc).replace(tzinfo=None)
+
             due_emails = (
                 db.query(ScheduledEmail)
-                .filter(ScheduledEmail.status == ScheduledEmailStatus.PENDING)
-                .filter(ScheduledEmail.scheduled_date <= now)
+                .filter(ScheduledEmail.status == ScheduledEmailStatus.PENDING.upper())
+                .filter(ScheduledEmail.scheduled_date <= now_naive)
                 .all()
             )
+            print(f"Found {len(due_emails)} due scheduled emails")
+            print(f"Due emails: {[email.id for email in due_emails]}")
 
             if not due_emails:
                 return
@@ -92,9 +101,11 @@ class EmailScheduler:
                 email.body,
             )
 
+            print(f"send_email result for email ID {email.id}: ok={ok}, payload={payload}")
+
             if ok:
                 email.status = ScheduledEmailStatus.SENT
-                email.sent_at = datetime.utcnow()
+                email.sent_at = now_npt()
                 email.message_id = payload.get("message_id")
                 logger.info(
                     f"Scheduled email {email.id} sent successfully to {email.recipient}"
@@ -122,8 +133,10 @@ scheduler = EmailScheduler(check_interval_seconds=60)
 async def start_scheduler():
     """Start the email scheduler."""
     await scheduler.start()
+    print("Email scheduler started")
 
 
 async def stop_scheduler():
     """Stop the email scheduler."""
     await scheduler.stop()
+    print("Email scheduler stopped")

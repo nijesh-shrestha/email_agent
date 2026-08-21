@@ -10,6 +10,7 @@ from googleapiclient.discovery import build
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
+from app.auth.settings import ALGORITHM, SECRET_KEY
 from app.database.models import OAuthAccount, User
 from app.database.session import get_db
 from dotenv import load_dotenv
@@ -30,9 +31,6 @@ SCOPES = [
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
 ]
-
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key")
-ALGORITHM = "HS256"
 
 pkce_store = {}
 
