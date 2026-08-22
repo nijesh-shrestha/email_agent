@@ -73,6 +73,13 @@ export function UpcomingEventsView({ apiUrl, token, defaultDays = 7 }: UpcomingE
     void fetchEvents();
   }, [fetchEvents]);
 
+  // Listen for refresh events
+  useEffect(() => {
+    const handleRefresh = () => fetchEvents();
+    window.addEventListener("calendar-refresh", handleRefresh);
+    return () => window.removeEventListener("calendar-refresh", handleRefresh);
+  }, [fetchEvents]);
+
   const handleDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Math.max(1, Math.min(365, Number(e.target.value) || 1));
     setLoading(true);

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardHeader, CardContent, Button, Badge } from "@/components/ui";
+import { formatNptDateTime } from "@/lib/timezone";
 
 interface ScheduledEmail {
   id: number;
@@ -82,9 +83,7 @@ export function ScheduledEmailList({ apiUrl, token, onRefresh }: ScheduledEmailL
           setError("Failed to fetch scheduled emails. Please try again.");
         }
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       }
     };
 
@@ -138,8 +137,7 @@ export function ScheduledEmailList({ apiUrl, token, onRefresh }: ScheduledEmailL
   };
 
   const formatDateWithTimezone = (dateString: string) => {
-    const date = new Date(dateString);
-    return `${date.toLocaleString()} (local)`;
+    return `${formatNptDateTime(dateString)} NPT`;
   };
 
   if (loading && scheduledEmails.length === 0) {

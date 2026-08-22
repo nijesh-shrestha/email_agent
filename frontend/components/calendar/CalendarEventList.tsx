@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardContent, Button, Input, Select, Badge } from "@/components/ui";
 import { formatNptDate, formatNptDateTime } from "@/lib/timezone";
 
@@ -39,7 +39,7 @@ export function CalendarEventList({ apiUrl, token }: CalendarEventListProps) {
     };
   });
 
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -72,7 +72,14 @@ export function CalendarEventList({ apiUrl, token }: CalendarEventListProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiUrl, token, formData]);
+
+  // Listen for refresh events
+  useEffect(() => {
+    const handleRefresh = () => fetchEvents();
+    window.addEventListener("calendar-refresh", handleRefresh);
+    return () => window.removeEventListener("calendar-refresh", handleRefresh);
+  }, [fetchEvents]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

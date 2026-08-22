@@ -6,7 +6,7 @@ import LogoutButton from "@/components/logoutButton";
 import { SendEmailForm, ReadEmailForm } from "@/components/email";
 import { ScheduleEmailForm, ScheduledEmailList } from "@/components/scheduled-emails";
 import { AgentChat } from "@/components/agent";
-import { CalendarAgentChat, CalendarEventList, CalendarSelector, UpcomingEventsView } from "@/components/calendar";
+import { CalendarAgentChat, CalendarEventList, CalendarSelector, UpcomingEventsView, CreateEventForm, CreateTaskForm, TaskListView } from "@/components/calendar";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -223,6 +223,27 @@ export default function Dashboard() {
           <div className="grid gap-6 lg:grid-cols-2">
             <CalendarEventList apiUrl={API_URL} token={currentToken} />
             <UpcomingEventsView apiUrl={API_URL} token={currentToken} />
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <CreateEventForm
+              apiUrl={API_URL}
+              token={currentToken}
+              onSuccess={() => {
+                // Trigger refresh of events list
+                window.dispatchEvent(new CustomEvent("calendar-refresh"));
+              }}
+            />
+            <CreateTaskForm
+              apiUrl={API_URL}
+              token={currentToken}
+              onSuccess={() => {
+                // Trigger refresh of tasks list
+                window.dispatchEvent(new CustomEvent("tasks-refresh"));
+              }}
+            />
+          </div>
+          <div className="lg:col-span-2">
+            <TaskListView apiUrl={API_URL} token={currentToken} />
           </div>
         </section>
       </div>
