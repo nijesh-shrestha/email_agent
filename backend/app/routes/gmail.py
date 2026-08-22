@@ -56,7 +56,6 @@ def gmail_send(request: SendRequest, db: Session = Depends(get_db), current_user
 def gmail_read(request: ReadRequest, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     try:
         ok, payload = read_user_emails(db, current_user.id, request.of_user, request.dates, request.amount)
-        print("gmail_read payload:", payload)
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
 

@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -58,10 +58,7 @@ class EmailScheduler:
         """Check for due scheduled emails and send them."""
         db = SessionLocal()
         try:
-            print("Checking for due scheduled emails...")
             now = now_npt()
-
-            print(f"Current NPT time: {now.isoformat()}")
 
             # Find all pending emails that are due
             # Database stores timezone-naive UTC values.
@@ -73,8 +70,6 @@ class EmailScheduler:
                 .filter(ScheduledEmail.scheduled_date <= now_naive)
                 .all()
             )
-            print(f"Found {len(due_emails)} due scheduled emails")
-            print(f"Due emails: {[email.id for email in due_emails]}")
 
             if not due_emails:
                 return
@@ -101,7 +96,6 @@ class EmailScheduler:
                 email.body,
             )
 
-            print(f"send_email result for email ID {email.id}: ok={ok}, payload={payload}")
 
             if ok:
                 email.status = ScheduledEmailStatus.SENT
@@ -133,10 +127,8 @@ scheduler = EmailScheduler(check_interval_seconds=60)
 async def start_scheduler():
     """Start the email scheduler."""
     await scheduler.start()
-    print("Email scheduler started")
 
 
 async def stop_scheduler():
     """Stop the email scheduler."""
     await scheduler.stop()
-    print("Email scheduler stopped")

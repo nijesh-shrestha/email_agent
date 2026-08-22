@@ -142,7 +142,6 @@ def read_user_emails(db, user_id: int, of_user: str, dates: Iterable[str] | str 
         profile = service.users().getProfile(userId="me").execute()
         user_email = profile.get("emailAddress", "")
         result = read_emails(service, user_email, of_user, dates, amount)
-        print("read_user_emails result:", result)
         return True, result
     except HttpError as e:
         return False, {"status": "error", "detail": e.content.decode() if hasattr(e, "content") else str(e)}

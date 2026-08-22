@@ -11,6 +11,10 @@ from app.services.calendar_service import (
     get_event_by_date,
     get_upcoming_events,
     list_calendars,
+    create_calendar_event,
+    create_task,
+    list_task_lists,
+    get_tasks,
 )
 from app.utils.timezone import now_npt, parse_datetime_to_utc
 
@@ -366,6 +370,151 @@ def list_calendars_tool(user_id: str) -> Dict[str, Any]:
     db: Session = SessionLocal()
     try:
         ok, payload = list_calendars(db, int(user_id))
+        if ok:
+            return {"success": True, **payload}
+        return {"success": False, **payload}
+    finally:
+        db.close()
+
+
+def create_calendar_event_tool(
+    user_id: str,
+    summary: str,
+    start_datetime: str,
+    end_datetime: str,
+    description: str = "",
+    location: str = "",
+    calendar_id: str = "primary",
+    attendees: list[str] | None = None,
+) -> Dict[str, Any]:
+    """Create a new Google Calendar event.
+
+    Args:
+        user_id: The user's ID
+        summary: Event title/summary
+        start_datetime: ISO format datetime string for event start (e.g., '2026-08-17T15:30:00')
+        end_datetime: ISO format datetime string for event end (e.g., '2026-08-17T16:30:00')
+        description: Event description (optional)
+        location: Event location (optional)
+        calendar_id: Calendar ID to create event in (default: 'primary')
+        attendees: List of attendee email addresses (optional)
+
+    Returns:
+        Dict with success status and created event details or error message
+    """
+    db: Session = SessionLocal()
+    try:
+        # Validate required fields
+        if not summary or not summary.strip():
+            return {"success": False, "error": "Event title is required"}
+
+        if not start_datetime or not end_datetime:
+            return {"success": False, "error": "Start and end datetime are required"}
+
+        ok, payload = create_calendar_event(
+            db,
+            int(user_id),
+            summary=summary.strip(),
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            description=description.strip() if description else "",
+            location=location.strip() if location else "",
+            calendar_id=calendar_id,
+            attendees=attendees,
+        )
+
+        if ok:
+            return {"success": True, **payload}
+        return {"success": False, **payload}
+    finally:
+        db.close()
+
+
+def create_task_tool(
+    user_id: str,
+    title: str,
+    notes: str = "",
+    due_datetime: str | None = None,
+    task_list_id: str = "@default",
+) -> Dict[str, Any]:
+    """Create a new Google Task.
+
+    Args:
+        user_id: The user's ID
+        title: Task title
+        notes: Task notes/description (optional)
+        due_datetime: ISO format datetime string for due date (optional)
+        task_list_id: Task list ID (default: '@default' for default list)
+
+    Returns:
+        Dict with success status and created task details or error message
+    """
+    db: Session = SessionLocal()
+    try:
+        if not title or not title.strip():
+            return {"success": False, "error": "Task title is required"}
+
+        ok, payload = create_task(
+            db,
+            int(user_id),
+            title=title.strip(),
+            notes=notes.strip() if notes else "",
+            due_datetime=due_datetime,
+            task_list_id=task_list_id,
+        )
+
+        if ok:
+            return {"success": True, **payload}
+        return {"success": False, **payload}
+    finally:
+        db.close()
+
+
+def list_task_lists_tool(user_id: str) -> Dict[str, Any]:
+    """List all task lists the user has access to.
+
+    Args:
+        user_id: The user's ID
+
+    Returns:
+        Dict with list of available task lists
+    """
+    db: Session = SessionLocal()
+    try:
+        ok, payload = list_task_lists(db, int(user_id))
+        if ok:
+            return {"success": True, **payload}
+        return {"success": False, **payload}
+    finally:
+        db.close()
+
+
+def get_tasks_tool(
+    user_id: str,
+    task_list_id: str = "@default",
+    max_results: int = 20,
+    show_completed: bool = False,
+) -> Dict[str, Any]:
+    """Retrieve tasks from a task list.
+
+    Args:
+        user_id: The user's ID
+        task_list_id: Task list ID (default: '@default')
+        max_results: Maximum number of tasks to return (default: 20)
+        show_completed: Whether to show completed tasks (default: False)
+
+    Returns:
+        Dict with list of tasks
+    """
+    db: Session = SessionLocal()
+    try:
+        ok, payload = get_tasks(
+            db,
+            int(user_id),
+            task_list_id=task_list_id,
+            max_results=max_results,
+            show_completed=show_completed,
+        )
         if ok:
             return {"success": True, **payload}
         return {"success": False, **payload}

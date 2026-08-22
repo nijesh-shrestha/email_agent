@@ -260,3 +260,276 @@ def list_calendars(db, user_id: int) -> Tuple[bool, dict]:
         }
     except Exception as e:
         return False, {"success": False, "error": str(e)}
+
+
+def create_calendar_event(
+    db,
+    user_id: int,
+    summary: str,
+    start_datetime: str,
+    end_datetime: str,
+    description: str = "",
+    location: str = "",
+    calendar_id: str = "primary",
+    attendees: list[str] | None = None,
+) -> Tuple[bool, dict]:
+    """Create a new calendar event.
+
+    Args:
+        db: Database session
+        user_id: The user's ID
+        summary: Event title/summary
+        start_datetime: ISO format datetime string for event start
+        end_datetime: ISO format datetime string for event end
+        description: Event description (optional)
+        location: Event location (optional)
+        calendar_id: Calendar ID to create event in (default: 'primary')
+        attendees: List of attendee email addresses (optional)
+
+    Returns:
+        Tuple of (success, result_dict)
+    """
+    try:
+        service = get_calendar_service(db, user_id)
+
+        # Parse datetime strings
+        start_dt = parse_datetime_to_utc(start_datetime)
+        end_dt = parse_datetime_to_utc(end_datetime)
+
+        # Validate that end is after start
+        if end_dt <= start_dt:
+            return False, {"success": False, "error": "End time must be after start time"}
+
+        # Build event object
+        event = {
+            "summary": summary,
+            "description": description,
+            "location": location,
+            "start": {
+                "dateTime": start_dt.isoformat(),
+                "timeZone": "UTC",
+            },
+            "end": {
+                "dateTime": end_dt.isoformat(),
+                "timeZone": "UTC",
+            },
+        }
+
+        if attendees:
+            event["attendees"] = [{"email": email} for email in attendees]
+
+        # Create the event
+        created_event = (
+            service.events()
+            .insert(calendarId=calendar_id, body=event, sendUpdates="all" if attendees else "none")
+            .execute()
+        )
+
+        return True, {
+            "success": True,
+            "event": {
+                "id": created_event.get("id"),
+                "summary": created_event.get("summary"),
+                "description": created_event.get("description", ""),
+                "location": created_event.get("location", ""),
+                "start": created_event.get("start", {}).get("dateTime", ""),
+                "end": created_event.get("end", {}).get("dateTime", ""),
+                "html_link": created_event.get("htmlLink", ""),
+                "status": created_event.get("status", ""),
+            },
+            "message": f"Event '{summary}' created successfully",
+        }
+
+    except HttpError as e:
+        if _is_insufficient_scope_error(e):
+            return False, {
+                "success": False,
+                "error": "insufficient_calendar_scope",
+                "message": "Google Calendar access requires additional permissions. Please reconnect your Google account to grant Calendar access.",
+            }
+        return False, {
+            "success": False,
+            "error": e.content.decode() if hasattr(e, "content") else str(e),
+        }
+    except Exception as e:
+        return False, {"success": False, "error": str(e)}
+
+
+def get_tasks_service(db, user_id: int):
+    """Build and return a Google Tasks service instance."""
+    creds = get_google_credentials(db, user_id)
+    return build("tasks", "v1", credentials=creds)
+
+
+def create_task(
+    db,
+    user_id: int,
+    title: str,
+    notes: str = "",
+    due_datetime: str | None = None,
+    task_list_id: str = "@default",
+) -> Tuple[bool, dict]:
+    """Create a new Google Task.
+
+    Args:
+        db: Database session
+        user_id: The user's ID
+        title: Task title
+        notes: Task notes/description (optional)
+        due_datetime: ISO format datetime string for due date (optional)
+        task_list_id: Task list ID (default: '@default' for default list)
+
+    Returns:
+        Tuple of (success, result_dict)
+    """
+    try:
+        service = get_tasks_service(db, user_id)
+
+        task = {
+            "title": title,
+            "notes": notes,
+        }
+
+        if due_datetime:
+            due_dt = parse_datetime_to_utc(due_datetime)
+            task["due"] = due_dt.isoformat()
+
+        created_task = (
+            service.tasks()
+            .insert(tasklist=task_list_id, body=task)
+            .execute()
+        )
+
+        return True, {
+            "success": True,
+            "task": {
+                "id": created_task.get("id"),
+                "title": created_task.get("title"),
+                "notes": created_task.get("notes", ""),
+                "due": created_task.get("due", ""),
+                "status": created_task.get("status", ""),
+                "updated": created_task.get("updated", ""),
+            },
+            "message": f"Task '{title}' created successfully",
+        }
+
+    except HttpError as e:
+        if _is_insufficient_scope_error(e):
+            return False, {
+                "success": False,
+                "error": "insufficient_tasks_scope",
+                "message": "Google Tasks access requires additional permissions. Please reconnect your Google account to grant Tasks access.",
+            }
+        return False, {
+            "success": False,
+            "error": e.content.decode() if hasattr(e, "content") else str(e),
+        }
+    except Exception as e:
+        return False, {"success": False, "error": str(e)}
+
+
+def list_task_lists(db, user_id: int) -> Tuple[bool, dict]:
+    """List all task lists the user has access to.
+
+    Args:
+        db: Database session
+        user_id: The user's ID
+
+    Returns:
+        Tuple of (success, result_dict)
+    """
+    try:
+        service = get_tasks_service(db, user_id)
+
+        task_lists_result = service.tasklists().list().execute()
+        task_lists = task_lists_result.get("items", [])
+
+        formatted_lists = []
+        for tl in task_lists:
+            formatted_lists.append({
+                "id": tl.get("id"),
+                "title": tl.get("title", ""),
+                "updated": tl.get("updated", ""),
+            })
+
+        return True, {
+            "success": True,
+            "count": len(formatted_lists),
+            "task_lists": formatted_lists,
+        }
+
+    except HttpError as e:
+        if _is_insufficient_scope_error(e):
+            return False, {
+                "success": False,
+                "error": "insufficient_tasks_scope",
+                "message": "Google Tasks access requires additional permissions. Please reconnect your Google account to grant Tasks access.",
+            }
+        return False, {
+            "success": False,
+            "error": e.content.decode() if hasattr(e, "content") else str(e),
+        }
+    except Exception as e:
+        return False, {"success": False, "error": str(e)}
+
+
+def get_tasks(
+    db,
+    user_id: int,
+    task_list_id: str = "@default",
+    max_results: int = 20,
+    show_completed: bool = False,
+) -> Tuple[bool, dict]:
+    """Retrieve tasks from a task list.
+
+    Args:
+        db: Database session
+        user_id: The user's ID
+        task_list_id: Task list ID (default: '@default')
+        max_results: Maximum number of tasks to return (default: 20)
+        show_completed: Whether to show completed tasks (default: False)
+
+    Returns:
+        Tuple of (success, result_dict)
+    """
+    try:
+        service = get_tasks_service(db, user_id)
+
+        tasks_result = (
+            service.tasks()
+            .list(tasklist=task_list_id, maxResults=max_results, showCompleted=show_completed)
+            .execute()
+        )
+        tasks = tasks_result.get("items", [])
+
+        formatted_tasks = []
+        for task in tasks:
+            formatted_tasks.append({
+                "id": task.get("id"),
+                "title": task.get("title", ""),
+                "notes": task.get("notes", ""),
+                "due": task.get("due", ""),
+                "status": task.get("status", ""),
+                "updated": task.get("updated", ""),
+            })
+
+        return True, {
+            "success": True,
+            "count": len(formatted_tasks),
+            "task_list_id": task_list_id,
+            "tasks": formatted_tasks,
+        }
+
+    except HttpError as e:
+        if _is_insufficient_scope_error(e):
+            return False, {
+                "success": False,
+                "error": "insufficient_tasks_scope",
+                "message": "Google Tasks access requires additional permissions. Please reconnect your Google account to grant Tasks access.",
+            }
+        return False, {
+            "success": False,
+            "error": e.content.decode() if hasattr(e, "content") else str(e),
+        }
+    except Exception as e:
+        return False, {"success": False, "error": str(e)}

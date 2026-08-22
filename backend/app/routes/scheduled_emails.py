@@ -73,7 +73,6 @@ def schedule_email_direct(
         body=request.body,
         scheduled_date=request.scheduled_date,
     )
-    print("schedule_email_direct result:", result)
 
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", "Failed to schedule email"))

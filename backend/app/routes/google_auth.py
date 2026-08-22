@@ -26,7 +26,8 @@ router = APIRouter(prefix="/auth/google", tags=["Google OAuth"])
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/calendar.readonly",
+    "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/tasks",
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
@@ -123,7 +124,7 @@ def google_start(current_user=Depends(get_current_user)):
 
     authorization_url, _ = flow.authorization_url(
         access_type="offline",
-        include_granted_scopes="true",
+        include_granted_scopes="false",
         prompt="consent",
         state=state
     )
@@ -148,7 +149,7 @@ def google_login_start() -> dict[str, str]:
 
     authorization_url, _ = flow.authorization_url(
         access_type="offline",
-        include_granted_scopes="true",
+        include_granted_scopes="false",
         prompt="consent",
         state=state,
         code_challenge=code_challenge,

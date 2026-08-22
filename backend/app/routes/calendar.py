@@ -13,6 +13,10 @@ from app.services.calendar_service import (
     get_event_by_date,
     get_upcoming_events,
     list_calendars,
+    create_calendar_event,
+    create_task,
+    list_task_lists,
+    get_tasks,
 )
 
 router = APIRouter(prefix="/calendar", tags=["Calendar Agent"])
@@ -71,6 +75,150 @@ class CalendarListResponse(BaseModel):
     success: bool
     count: int
     calendars: list[dict]
+
+
+class CreateEventRequest(BaseModel):
+    summary: str
+    start_datetime: str
+    end_datetime: str
+    description: str = ""
+    location: str = ""
+    calendar_id: str = "primary"
+    attendees: list[str] | None = None
+
+
+class CreateTaskRequest(BaseModel):
+    title: str
+    notes: str = ""
+    due_datetime: str | None = None
+    task_list_id: str = "@default"
+
+
+class TaskListsResponse(BaseModel):
+    success: bool
+    count: int
+    task_lists: list[dict]
+
+
+class TasksResponse(BaseModel):
+    success: bool
+    count: int
+    task_list_id: str
+    tasks: list[dict]
+
+
+@router.post("/events", response_model=dict)
+def create_calendar_event_endpoint(
+    request: CreateEventRequest,
+    current_user=Depends(get_current_user),
+):
+    """Create a new calendar event."""
+    db = SessionLocal()
+    try:
+        ok, payload = create_calendar_event(
+            db,
+            current_user.id,
+            summary=request.summary,
+            start_datetime=request.start_datetime,
+            end_datetime=request.end_datetime,
+            description=request.description,
+            location=request.location,
+            calendar_id=request.calendar_id,
+            attendees=request.attendees,
+        )
+        if not ok:
+            error_type = payload.get("error")
+            message = payload.get("message", payload.get("error", "Unknown error"))
+            if error_type == "insufficient_calendar_scope":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=message,
+                )
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=message)
+        return payload
+    finally:
+        db.close()
+
+
+@router.post("/tasks", response_model=dict)
+def create_task_endpoint(
+    request: CreateTaskRequest,
+    current_user=Depends(get_current_user),
+):
+    """Create a new Google Task."""
+    db = SessionLocal()
+    try:
+        ok, payload = create_task(
+            db,
+            current_user.id,
+            title=request.title,
+            notes=request.notes,
+            due_datetime=request.due_datetime,
+            task_list_id=request.task_list_id,
+        )
+        if not ok:
+            error_type = payload.get("error")
+            message = payload.get("message", payload.get("error", "Unknown error"))
+            if error_type == "insufficient_tasks_scope":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=message,
+                )
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=message)
+        return payload
+    finally:
+        db.close()
+
+
+@router.get("/task-lists", response_model=TaskListsResponse)
+def list_task_lists_endpoint(current_user=Depends(get_current_user)):
+    """List all task lists the user has access to."""
+    db = SessionLocal()
+    try:
+        ok, payload = list_task_lists(db, current_user.id)
+        if not ok:
+            error_type = payload.get("error")
+            message = payload.get("message", payload.get("error", "Unknown error"))
+            if error_type == "insufficient_tasks_scope":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=message,
+                )
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=message)
+        return payload
+    finally:
+        db.close()
+
+
+@router.get("/tasks", response_model=TasksResponse)
+def get_tasks_endpoint(
+    current_user=Depends(get_current_user),
+    task_list_id: str = Query("@default"),
+    max_results: int = Query(20, ge=1, le=100),
+    show_completed: bool = Query(False),
+):
+    """Retrieve tasks from a task list."""
+    db = SessionLocal()
+    try:
+        ok, payload = get_tasks(
+            db,
+            current_user.id,
+            task_list_id=task_list_id,
+            max_results=max_results,
+            show_completed=show_completed,
+        )
+        if not ok:
+            error_type = payload.get("error")
+            message = payload.get("message", payload.get("error", "Unknown error"))
+            if error_type == "insufficient_tasks_scope":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=message,
+                )
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=message)
+        return payload
+    finally:
+        db.close()
 
 
 @router.post("/run", response_model=CalendarAgentResponse)
